@@ -130,42 +130,33 @@ async def health():
     return {
         "status": "ok",
         "version": "2.0.0",
-        "mockMode": settings.use_mock_data,
-        "hasGoogleKey": bool(settings.google_places_api_key),
         "hasAnthropicKey": bool(settings.anthropic_api_key),
+        "hasFirecrawlKey": bool(settings.firecrawl_api_key),
     }
 
 
 class ConfigUpdate(BaseModel):
-    googlePlacesApiKey: Optional[str] = None
     anthropicApiKey: Optional[str] = None
-    useMockData: Optional[bool] = None
     batchSize: Optional[int] = None
 
 
 @app.get("/api/config", tags=["system"])
 async def get_config():
     return {
-        "googlePlacesApiKey": "••••••••" if settings.google_places_api_key else "",
         "anthropicApiKey": "••••••••" if settings.anthropic_api_key else "",
-        "useMockData": settings.use_mock_data,
         "batchSize": settings.batch_size,
-        "hasGoogleKey": bool(settings.google_places_api_key),
         "hasAnthropicKey": bool(settings.anthropic_api_key),
+        "hasFirecrawlKey": bool(settings.firecrawl_api_key),
     }
 
 
 @app.put("/api/config", tags=["system"])
 async def update_config(body: ConfigUpdate):
-    if body.googlePlacesApiKey is not None:
-        settings.google_places_api_key = body.googlePlacesApiKey
     if body.anthropicApiKey is not None:
         settings.anthropic_api_key = body.anthropicApiKey
-    if body.useMockData is not None:
-        settings.use_mock_data = body.useMockData
     if body.batchSize is not None:
         settings.batch_size = body.batchSize
-    return {"status": "updated", "useMockData": settings.use_mock_data}
+    return {"status": "updated"}
 
 
 if __name__ == "__main__":

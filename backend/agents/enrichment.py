@@ -133,8 +133,6 @@ class EnrichmentAgent:
         )
 
     async def enrich(self, company: dict) -> dict:
-        if settings.use_mock_data:
-            return await self._mock_enrich(company)
         return await self._real_enrich(company)
 
     async def _mock_enrich(self, company: dict) -> dict:
