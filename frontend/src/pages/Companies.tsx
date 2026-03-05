@@ -2,11 +2,19 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, Download, Star, Globe, ChevronUp, ChevronDown, ArrowUpDown, MapPin
+  Search, Download, Star, Globe, ChevronUp, ChevronDown, ArrowUpDown, MapPin, SlidersHorizontal
 } from 'lucide-react'
 import { fetchCompanies } from '../api/client'
 import { WORKFLOW_LABELS } from '../types'
 import type { WorkflowStatus } from '../types'
+
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+]
 
 const scoreColor = (s: number) =>
   s >= 60 ? 'text-terminal-green' : s >= 40 ? 'text-terminal-amber' : 'text-terminal-red'
@@ -22,23 +30,44 @@ export default function Companies() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [state, setState] = useState('')
   const [sortBy, setSortBy] = useState<SortCol>('score')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [minScore, setMinScore] = useState<number | null>(null)
+
+  // Filters
+  const [filterState, setFilterState] = useState('')
+  const [filterMinScore, setFilterMinScore] = useState(0)
+  const [filterMaxScore, setFilterMaxScore] = useState(100)
+  const [filterMinRating, setFilterMinRating] = useState(0)
+  const [filterRevenue, setFilterRevenue] = useState('')
 
   const { data, isLoading } = useQuery({
-    queryKey: ['companies', page, search, state, sortBy, sortOrder, minScore],
+    queryKey: ['companies', page, search, filterState, sortBy, sortOrder, filterMinScore, filterMaxScore, filterMinRating],
     queryFn: () => fetchCompanies({
       page, limit: 50, sortBy, sortOrder,
-      state: state || undefined,
+      state: filterState || undefined,
       search: search || undefined,
-      minScore,
+      minScore: filterMinScore > 0 ? filterMinScore : null,
+      maxScore: filterMaxScore < 100 ? filterMaxScore : null,
     }),
     staleTime: 30_000,
   })
 
-  const companies = (data?.companies || []) as any[]
+  const allCompanies = (data?.companies || []) as any[]
+
+  // Client-side filter for rating and revenue (not in API)
+  const companies = allCompanies.filter((c: any) => {
+    if (filterMinRating > 0 && (c.googleRating == null || c.googleRating < filterMinRating)) return false
+    if (filterRevenue) {
+      const reviews = c.googleReviewCount ?? 0
+      const estRevenue = reviews * 8 * 385
+      if (filterRevenue === 'lt500k' && estRevenue >= 500_000) return false
+      if (filterRevenue === '500k-1m' && (estRevenue < 500_000 || estRevenue >= 1_000_000)) return false
+      if (filterRevenue === '1m-3m' && (estRevenue < 1_000_000 || estRevenue >= 3_000_000)) return false
+      if (filterRevenue === 'gt3m' && estRevenue < 3_000_000) return false
+    }
+    return true
+  })
+
   const total = data?.total || 0
   const pages = data?.pages || 1
 
@@ -54,6 +83,8 @@ export default function Companies() {
       ? <ChevronDown size={11} className="text-accent" />
       : <ChevronUp size={11} className="text-accent" />
   }
+
+  const hasActiveFilters = filterState || filterMinScore > 0 || filterMaxScore < 100 || filterMinRating > 0 || filterRevenue
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -75,28 +106,6 @@ export default function Companies() {
           />
         </div>
 
-        <select
-          value={state}
-          onChange={e => { setState(e.target.value); setPage(1) }}
-          className="bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none"
-        >
-          <option value="">All States</option>
-          {['AZ','TX','FL','TN','NC','GA','CA','CO','NV','SC','VA'].map(s => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-
-        <select
-          value={minScore ?? ''}
-          onChange={e => { setMinScore(e.target.value ? Number(e.target.value) : null); setPage(1) }}
-          className="bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none"
-        >
-          <option value="">All Scores</option>
-          <option value="60">Score ≥ 60</option>
-          <option value="40">Score ≥ 40</option>
-          <option value="20">Score ≥ 20</option>
-        </select>
-
         <div className="flex-1" />
         <button
           onClick={() => window.open('/api/companies/export/csv', '_blank')}
@@ -104,6 +113,100 @@ export default function Companies() {
         >
           <Download size={12} /> Export CSV
         </button>
+      </div>
+
+      {/* Filter bar */}
+      <div className="px-6 py-2.5 border-b border-surface-600 bg-navy-800/60 shrink-0">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <SlidersHorizontal size={11} />
+            <span className="text-[10px] font-mono uppercase tracking-wider">Filters</span>
+          </div>
+
+          {/* State */}
+          <select
+            value={filterState}
+            onChange={e => { setFilterState(e.target.value); setPage(1) }}
+            className="bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-accent/50"
+          >
+            <option value="">All States</option>
+            {US_STATES.map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          {/* Conviction Score range */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-500 font-mono">Score</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={filterMinScore}
+              onChange={e => { setFilterMinScore(Number(e.target.value)); setPage(1) }}
+              placeholder="0"
+              className="w-14 bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-accent/50 font-mono text-center"
+            />
+            <span className="text-slate-600 text-xs">–</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={filterMaxScore}
+              onChange={e => { setFilterMaxScore(Number(e.target.value)); setPage(1) }}
+              placeholder="100"
+              className="w-14 bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-accent/50 font-mono text-center"
+            />
+          </div>
+
+          {/* Min Rating */}
+          <select
+            value={filterMinRating}
+            onChange={e => { setFilterMinRating(Number(e.target.value)); setPage(1) }}
+            className="bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-accent/50"
+          >
+            <option value={0}>Any Rating</option>
+            <option value={3.0}>≥ 3.0 ★</option>
+            <option value={3.5}>≥ 3.5 ★</option>
+            <option value={4.0}>≥ 4.0 ★</option>
+            <option value={4.5}>≥ 4.5 ★</option>
+          </select>
+
+          {/* Est. Revenue */}
+          <select
+            value={filterRevenue}
+            onChange={e => { setFilterRevenue(e.target.value); setPage(1) }}
+            className="bg-surface-700 border border-surface-500 rounded px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-accent/50"
+          >
+            <option value="">Any Revenue</option>
+            <option value="lt500k">&lt; $500K</option>
+            <option value="500k-1m">$500K – $1M</option>
+            <option value="1m-3m">$1M – $3M</option>
+            <option value="gt3m">$3M+</option>
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setFilterState('')
+                setFilterMinScore(0)
+                setFilterMaxScore(100)
+                setFilterMinRating(0)
+                setFilterRevenue('')
+                setPage(1)
+              }}
+              className="text-[10px] text-slate-500 hover:text-slate-300 font-mono underline transition-colors ml-1"
+            >
+              Clear
+            </button>
+          )}
+
+          {companies.length !== allCompanies.length && (
+            <span className="text-[10px] text-slate-600 font-mono ml-auto">
+              {companies.length} shown
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Table */}

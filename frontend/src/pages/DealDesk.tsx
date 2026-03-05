@@ -9,9 +9,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchDealFeed, fetchTop5, fetchTearsheet, updateWorkflow, generateMemo, fetchComps
 } from '../api/client'
-import type { Deal, WorkflowStatus, MemoItem } from '../types'
+import type { Deal, WorkflowStatus, MemoItem, Company } from '../types'
 import { WORKFLOW_LABELS as WORKFLOW_LABELS_FROM_TYPES } from '../types'
 import ReactMarkdown from 'react-markdown'
+import MemoExport from '../components/MemoExport'
 
 const fmtDollar = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` :
@@ -28,6 +29,35 @@ const scoreBg = (s: number) =>
 const WORKFLOW_LABELS: Record<string, string> = WORKFLOW_LABELS_FROM_TYPES
 
 const WORKFLOW_STATUSES = Object.keys(WORKFLOW_LABELS) as WorkflowStatus[]
+
+function buildBriefingText(deal: Company): string {
+  const score = deal.convictionScore ?? 0
+  const reviews = deal.googleReviewCount ?? 0
+  const revenue = reviews * 8 * 385
+  const ebitda = revenue * 0.2
+  const valLow = (deal.valuationBand as any)?.low ?? Math.round(ebitda * 3.5)
+  const valHigh = (deal.valuationBand as any)?.high ?? Math.round(ebitda * 5.5)
+
+  return `# Deal Briefing: ${deal.name}
+
+**Conviction Score:** ${score}/100
+**Location:** ${deal.city}, ${deal.state}
+**Contact:** ${deal.phone ?? 'N/A'} | ${deal.website ?? 'N/A'}
+**Status:** ${(WORKFLOW_LABELS[deal.workflowStatus as WorkflowStatus] ?? deal.workflowStatus) || 'Not Contacted'}
+
+## Investment Thesis
+${(deal.thesisBullets as any)?.map((b: string) => `- ${b}`).join('\n') ?? '- Evaluate further'}
+
+## Key Risks
+${(deal.keyRisks as any)?.map((r: string) => `- ${r}`).join('\n') ?? '- Standard sector risks'}
+
+## Valuation Range
+- Conservative: $${valLow.toLocaleString()}
+- Optimistic: $${valHigh.toLocaleString()}
+
+*Est. Revenue: $${revenue.toLocaleString()} | Est. EBITDA: $${ebitda.toLocaleString()}*
+`
+}
 
 const US_STATES = [
   'AL','AZ','AR','CA','CO','CT','DE','FL','GA','ID','IL','IN','IA','KS',
@@ -222,6 +252,15 @@ function DecisionPane({ deal, onWorkflowUpdate }: {
   return (
     <div className="flex flex-col h-full bg-navy-gradient border-l border-surface-600">
       <div className="px-5 pt-4 pb-3 border-b border-surface-600 shrink-0">
+        {activeDeal && (
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+            <span className="terminal-label text-[10px]">DEAL TEARSHEET</span>
+            <MemoExport
+              memoContent={buildBriefingText(activeDeal)}
+              companyName={activeDeal.name}
+            />
+          </div>
+        )}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-display font-semibold text-slate-100 leading-tight truncate">{activeDeal?.name}</h2>
