@@ -2,11 +2,12 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from database import get_db
 from models import Company, WorkflowEvent
+from auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
 
@@ -27,11 +28,16 @@ async def update_workflow(
     company_id: str,
     body: WorkflowUpdate,
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status: {body.status}")
 
-    res = await db.execute(select(Company).where(Company.id == company_id))
+    res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
     c = res.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -67,7 +73,21 @@ async def update_workflow(
 
 
 @router.get("/{company_id}/events")
-async def get_workflow_events(company_id: str, db: AsyncSession = Depends(get_db)):
+async def get_workflow_events(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    # Verify company belongs to user before returning events
+    c_res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
+    company = c_res.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
     res = await db.execute(
         select(WorkflowEvent)
         .where(WorkflowEvent.company_id == company_id)

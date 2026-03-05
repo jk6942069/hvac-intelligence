@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from database import get_db
 from models import Company, Dossier
 from config import settings
+from auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -77,8 +78,9 @@ async def list_companies(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    filters = []
+    filters = [Company.user_id == user.user_id]
     if min_score is not None:
         filters.append(Company.score >= min_score)
     if max_score is not None:
@@ -94,7 +96,7 @@ async def list_companies(
             Company.state.ilike(f"%{search}%"),
         ))
 
-    where_clause = and_(*filters) if filters else True
+    where_clause = and_(*filters)
 
     count_res = await db.execute(select(func.count(Company.id)).where(where_clause))
     total = count_res.scalar() or 0
@@ -121,8 +123,15 @@ async def list_companies(
 
 
 @router.get("/export/csv")
-async def export_csv(db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(Company).order_by(Company.score.desc()))
+async def export_csv(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    res = await db.execute(
+        select(Company)
+        .where(Company.user_id == user.user_id)
+        .order_by(Company.score.desc())
+    )
     companies = res.scalars().all()
 
     buf = io.StringIO()
@@ -152,8 +161,15 @@ async def export_csv(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/export/json")
-async def export_json(db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(Company).order_by(Company.score.desc()))
+async def export_json(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    res = await db.execute(
+        select(Company)
+        .where(Company.user_id == user.user_id)
+        .order_by(Company.score.desc())
+    )
     companies = res.scalars().all()
     data = [company_to_dict(c) for c in companies]
     content = json.dumps(data, indent=2, default=str)
@@ -177,8 +193,16 @@ async def get_valuation_config():
 
 
 @router.get("/{company_id}")
-async def get_company(company_id: str, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(Company).where(Company.id == company_id))
+async def get_company(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
     company = res.scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -203,8 +227,13 @@ async def submit_feedback(
     company_id: str,
     body: FeedbackBody,
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    res = await db.execute(select(Company).where(Company.id == company_id))
+    res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
     company = res.scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")

@@ -2,11 +2,12 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, AsyncSessionLocal
 from models import Dossier, Company
 from sqlalchemy import update
+from auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/dossiers", tags=["dossiers"])
 
@@ -16,14 +17,21 @@ async def list_dossiers(
     page: int = 1,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    count_res = await db.execute(select(func.count(Dossier.id)))
+    # Count dossiers for companies owned by this user
+    count_res = await db.execute(
+        select(func.count(Dossier.id))
+        .join(Company, Dossier.company_id == Company.id)
+        .where(Company.user_id == user.user_id)
+    )
     total = count_res.scalar() or 0
 
     offset = (page - 1) * limit
     res = await db.execute(
         select(Dossier, Company)
         .join(Company, Dossier.company_id == Company.id)
+        .where(Company.user_id == user.user_id)
         .order_by(Company.score.desc())
         .offset(offset)
         .limit(limit)
@@ -53,7 +61,21 @@ async def list_dossiers(
 
 
 @router.get("/{company_id}")
-async def get_dossier(company_id: str, db: AsyncSession = Depends(get_db)):
+async def get_dossier(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    # Verify company belongs to user
+    c_res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
+    company = c_res.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
     res = await db.execute(select(Dossier).where(Dossier.company_id == company_id))
     dossier = res.scalar_one_or_none()
     if not dossier:
@@ -72,8 +94,13 @@ async def generate_dossier(
     company_id: str,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    res = await db.execute(select(Company).where(Company.id == company_id))
+    res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
     company = res.scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")

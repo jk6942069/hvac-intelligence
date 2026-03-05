@@ -3,11 +3,12 @@ import uuid
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from database import get_db, AsyncSessionLocal
 from models import Memo, Company
+from auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/memos", tags=["memos"])
 
@@ -19,10 +20,24 @@ class MemoUpdate(BaseModel):
 
 
 @router.get("/{company_id}")
-async def get_memos(company_id: str, db: AsyncSession = Depends(get_db)):
+async def get_memos(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    # Verify company belongs to user
+    c_res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
+    company = c_res.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
     res = await db.execute(
         select(Memo)
-        .where(Memo.company_id == company_id)
+        .where(and_(Memo.company_id == company_id, Memo.user_id == user.user_id))
         .order_by(Memo.version.desc())
     )
     memos = res.scalars().all()
@@ -49,15 +64,23 @@ async def generate_memo(
     company_id: str,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    res = await db.execute(select(Company).where(Company.id == company_id))
+    res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
     c = res.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Company not found")
 
     # Get next version number
     ver_res = await db.execute(
-        select(Memo).where(Memo.company_id == company_id).order_by(Memo.version.desc()).limit(1)
+        select(Memo)
+        .where(and_(Memo.company_id == company_id, Memo.user_id == user.user_id))
+        .order_by(Memo.version.desc())
+        .limit(1)
     )
     existing = ver_res.scalar_one_or_none()
     next_version = (existing.version + 1) if existing else 1
@@ -71,6 +94,7 @@ async def generate_memo(
         title=f"Investment Memo v{next_version} -- {c.name}",
         content="*Generating...*",
         status="generating",
+        user_id=user.user_id,
     )
     db.add(placeholder)
     await db.commit()
@@ -201,8 +225,13 @@ async def update_memo(
     memo_id: str,
     body: MemoUpdate,
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    res = await db.execute(select(Memo).where(Memo.id == memo_id))
+    res = await db.execute(
+        select(Memo).where(
+            and_(Memo.id == memo_id, Memo.user_id == user.user_id)
+        )
+    )
     memo = res.scalar_one_or_none()
     if not memo:
         raise HTTPException(status_code=404, detail="Memo not found")

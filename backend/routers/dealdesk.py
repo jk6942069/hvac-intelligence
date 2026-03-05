@@ -1,11 +1,12 @@
 """Deal Desk API -- primary investor-facing ranked feed."""
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models import Company, Dossier, Memo
+from auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/dealdesk", tags=["dealdesk"])
 
@@ -105,11 +106,12 @@ async def deal_feed(
     sort_by: str = Query("conviction_score"),
     sort_order: str = Query("desc"),
     db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
     """Main deal feed -- ranked acquisition targets."""
     from sqlalchemy import func
 
-    filters = []
+    filters = [Company.user_id == user.user_id]
     if min_conviction is not None:
         filters.append(Company.conviction_score >= min_conviction)
     if max_conviction is not None:
@@ -125,7 +127,7 @@ async def deal_feed(
             Company.state.ilike(f"%{search}%"),
         ))
 
-    where = and_(*filters) if filters else True
+    where = and_(*filters)
 
     # Count
     cnt = (await db.execute(select(func.count(Company.id)).where(where))).scalar() or 0
@@ -170,11 +172,14 @@ async def deal_feed(
 
 
 @router.get("/top5")
-async def top5_deals(db: AsyncSession = Depends(get_db)):
+async def top5_deals(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
     """Today's Focus -- top 5 highest conviction targets."""
     res = await db.execute(
         select(Company)
-        .where(Company.conviction_score > 0)
+        .where(and_(Company.conviction_score > 0, Company.user_id == user.user_id))
         .order_by(Company.conviction_score.desc())
         .limit(5)
     )
@@ -192,14 +197,19 @@ async def top5_deals(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/tearsheet/{company_id}")
-async def tearsheet(company_id: str, db: AsyncSession = Depends(get_db)):
+async def tearsheet(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
     """Full tearsheet payload for decision pane."""
-    from sqlalchemy.exc import NoResultFound
-
-    res = await db.execute(select(Company).where(Company.id == company_id))
+    res = await db.execute(
+        select(Company).where(
+            and_(Company.id == company_id, Company.user_id == user.user_id)
+        )
+    )
     c = res.scalar_one_or_none()
     if not c:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Company not found")
 
     d_res = await db.execute(select(Dossier).where(Dossier.company_id == company_id))

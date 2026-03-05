@@ -2,11 +2,12 @@
 import asyncio
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 from pydantic import BaseModel
 from database import AsyncSessionLocal
 from models import PipelineRun
+from auth import get_current_user, CurrentUser, get_current_user_ws
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
@@ -46,7 +47,11 @@ class RunConfig(BaseModel):
 
 
 @router.post("/run")
-async def start_pipeline(config: RunConfig, background_tasks: BackgroundTasks):
+async def start_pipeline(
+    config: RunConfig,
+    background_tasks: BackgroundTasks,
+    user: CurrentUser = Depends(get_current_user),
+):
     import uuid
     from agents.scout import DEFAULT_CITIES
 
@@ -85,11 +90,14 @@ async def start_pipeline(config: RunConfig, background_tasks: BackgroundTasks):
 
 
 @router.get("/status")
-async def pipeline_status():
+async def pipeline_status(user: CurrentUser = Depends(get_current_user)):
     orch = _get_orchestrator()
     async with AsyncSessionLocal() as db:
         res = await db.execute(
-            select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(1)
+            select(PipelineRun)
+            .where(PipelineRun.user_id == user.user_id)
+            .order_by(PipelineRun.started_at.desc())
+            .limit(1)
         )
         last = res.scalar_one_or_none()
 
@@ -113,10 +121,13 @@ async def pipeline_status():
 
 
 @router.get("/history")
-async def pipeline_history():
+async def pipeline_history(user: CurrentUser = Depends(get_current_user)):
     async with AsyncSessionLocal() as db:
         res = await db.execute(
-            select(PipelineRun).order_by(PipelineRun.started_at.desc()).limit(25)
+            select(PipelineRun)
+            .where(PipelineRun.user_id == user.user_id)
+            .order_by(PipelineRun.started_at.desc())
+            .limit(25)
         )
         runs = res.scalars().all()
     return [
@@ -135,8 +146,15 @@ async def pipeline_history():
 
 
 @router.websocket("/ws")
-async def ws_endpoint(websocket: WebSocket):
+async def ws_endpoint(websocket: WebSocket, token: str = ""):
     await websocket.accept()
+    if token:
+        try:
+            async with AsyncSessionLocal() as db:
+                await get_current_user_ws(token, db)
+        except Exception:
+            await websocket.close(code=4001)
+            return
     _ws_connections.append(websocket)
     try:
         while True:
