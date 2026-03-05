@@ -6,10 +6,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from auth import get_current_user, CurrentUser
 from config import settings
 from database import init_db, migrate_db, AsyncSessionLocal
 from routers.companies import router as companies_router
@@ -147,7 +148,7 @@ class ConfigUpdate(BaseModel):
 
 
 @app.get("/api/config", tags=["system"])
-async def get_config():
+async def get_config(_user: CurrentUser = Depends(get_current_user)):
     return {
         "anthropicApiKey": "••••••••" if settings.anthropic_api_key else "",
         "batchSize": settings.batch_size,
@@ -157,7 +158,7 @@ async def get_config():
 
 
 @app.put("/api/config", tags=["system"])
-async def update_config(body: ConfigUpdate):
+async def update_config(body: ConfigUpdate, _user: CurrentUser = Depends(get_current_user)):
     if body.anthropicApiKey is not None:
         settings.anthropic_api_key = body.anthropicApiKey
     if body.batchSize is not None:

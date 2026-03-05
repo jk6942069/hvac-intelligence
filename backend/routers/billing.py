@@ -85,6 +85,12 @@ async def stripe_webhook(request: Request):
         except Exception:
             raise HTTPException(400, "Invalid webhook signature")
     else:
+        # STRIPE_WEBHOOK_SECRET not set — accepting unverified payload.
+        # This is acceptable in local dev only. In production ALWAYS set STRIPE_WEBHOOK_SECRET.
+        logger.warning(
+            "STRIPE_WEBHOOK_SECRET not set — processing webhook WITHOUT signature verification "
+            "(dev mode only). Set STRIPE_WEBHOOK_SECRET in production."
+        )
         event = json.loads(payload)
 
     event_type = event.get("type", "")

@@ -106,7 +106,7 @@ class Company(Base):
     raw_google_data = Column(JSON)
 
     # Multi-tenancy
-    user_id = Column(String, index=True)  # FK to users.id — set on insert, nullable for legacy data
+    user_id = Column(String, ForeignKey("users.id"), index=True)  # nullable for legacy data
 
 
 class PipelineRun(Base):
@@ -121,7 +121,7 @@ class PipelineRun(Base):
     current_stage = Column(String, default="initializing")
     error = Column(Text)
     config_json = Column(JSON)
-    user_id = Column(String, index=True)
+    user_id = Column(String, ForeignKey("users.id"), index=True)
     cities = Column(JSON)   # list of "City, ST" strings
 
 
@@ -148,7 +148,7 @@ class Memo(Base):
     generated_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     model_used = Column(String, default="claude-3-5-sonnet-20241022")
-    user_id = Column(String, index=True)
+    user_id = Column(String, ForeignKey("users.id"), index=True)
 
 
 class WorkflowEvent(Base):

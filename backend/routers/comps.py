@@ -4,12 +4,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models import CompDeal
+from auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/comps", tags=["comps"])
 
 
 @router.get("")
-async def list_comps(db: AsyncSession = Depends(get_db)):
+async def list_comps(
+    db: AsyncSession = Depends(get_db),
+    _user: CurrentUser = Depends(get_current_user),
+):
     res = await db.execute(select(CompDeal).order_by(CompDeal.deal_year.desc()))
     comps = res.scalars().all()
     return {

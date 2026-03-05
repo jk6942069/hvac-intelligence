@@ -69,6 +69,7 @@ async def _upsert_user(db: AsyncSession, user_id: str, email: str) -> User:
             user.scans_used_this_month = 0
             user.scans_reset_at = now
             await db.commit()
+            await db.refresh(user)  # reload post-commit to get actual DB state
 
     return user
 

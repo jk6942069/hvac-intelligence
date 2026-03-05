@@ -72,20 +72,40 @@ async def start_pipeline(
     import uuid
     from agents.scout import DEFAULT_CITIES
 
-    check_scan_quota(user)
+    check_scan_quota(user)  # fast advisory check using cached value from get_current_user
 
     orch = _get_orchestrator()
     if orch.is_running:
         return {"status": "already_running", "run_id": orch.current_run_id}
 
-    # Increment monthly scan counter
+    # Atomically increment scan counter — prevents race condition on concurrent requests.
+    # For limited plans: only increments if still under quota (WHERE scans_used < limit).
+    # rowcount == 0 means the limit was hit between advisory check and this atomic step.
+    limit = PLAN_LIMITS.get(user.plan)
     async with AsyncSessionLocal() as db:
-        await db.execute(
-            sql_update(User)
-            .where(User.id == user.user_id)
-            .values(scans_used_this_month=User.scans_used_this_month + 1)
-        )
-        await db.commit()
+        if limit is not None:
+            result = await db.execute(
+                sql_update(User)
+                .where(
+                    User.id == user.user_id,
+                    User.scans_used_this_month < limit,
+                )
+                .values(scans_used_this_month=User.scans_used_this_month + 1)
+            )
+            await db.commit()
+            if result.rowcount == 0:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Monthly scan limit of {limit} reached. Upgrade to Professional.",
+                )
+        else:
+            # Unlimited plan — always increment
+            await db.execute(
+                sql_update(User)
+                .where(User.id == user.user_id)
+                .values(scans_used_this_month=User.scans_used_this_month + 1)
+            )
+            await db.commit()
 
     # Resolve target cities
     target_cities = DEFAULT_CITIES
@@ -177,13 +197,15 @@ async def pipeline_history(user: CurrentUser = Depends(get_current_user)):
 @router.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket, token: str = ""):
     await websocket.accept()
-    if token:
-        try:
-            async with AsyncSessionLocal() as db:
-                await get_current_user_ws(token, db)
-        except Exception:
-            await websocket.close(code=4001)
-            return
+    if not token:
+        await websocket.close(code=4001)
+        return
+    try:
+        async with AsyncSessionLocal() as db:
+            await get_current_user_ws(token, db)
+    except Exception:
+        await websocket.close(code=4001)
+        return
     _ws_connections.append(websocket)
     try:
         while True:

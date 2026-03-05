@@ -49,7 +49,7 @@ async def test_health_is_public(app):
 
 
 @pytest.mark.anyio
-async def test_stats_is_public(app):
+async def test_stats_requires_auth(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.get("/api/stats/dashboard")
-    assert r.status_code == 200
+    assert r.status_code == 401
