@@ -10,9 +10,12 @@ Sub-scores:
 Acquisition Conviction Score = sum of all three (0-100)
 """
 import logging
+from datetime import date
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+CURRENT_YEAR = date.today().year
 
 # -- Sun Belt / high-growth HVAC markets ----------------------------------------
 PREMIUM_MARKETS = {"AZ","TX","FL","TN","NC","GA","SC","NV","CO","VA"}
@@ -74,6 +77,23 @@ def _transition_pressure(company: dict) -> tuple:
         score += 5
         factors.append("Declining rating trend -- possible service fatigue or owner disengagement")
 
+    # Content signal augmentation
+    is_family_owned = company.get("is_family_owned_likely")
+    years_claimed = company.get("years_in_business_claimed")
+
+    # Family ownership → key-man / succession pressure
+    if is_family_owned is True:
+        score = min(40, score + 4)
+        factors.append("Family-owned -- succession planning is a common exit trigger")
+
+    # Claimed tenure supplements domain age signal
+    if years_claimed and years_claimed > 20:
+        bonus = 5 if years_claimed >= 30 else 3
+        score = min(40, score + bonus)
+        factors.append(
+            f"In business {years_claimed}+ years (stated on website) -- founding-generation operator"
+        )
+
     return min(score, 40), factors
 
 
@@ -90,7 +110,7 @@ def _business_quality(company: dict) -> tuple:
 
     # Rating quality -- proxy for service excellence and customer retention
     if rating >= 4.5 and review_count >= 100:
-        score += 30
+        score += 27
         factors.append(f"{rating}★ rating with {review_count}+ reviews -- exceptional service track record")
     elif rating >= 4.5 and review_count >= 50:
         score += 26
@@ -132,6 +152,21 @@ def _business_quality(company: dict) -> tuple:
     if website_active and ssl_valid:
         score += 2
         factors.append("Active website with SSL -- basic digital infrastructure in place")
+
+    # Content signal augmentation
+    offers_24_7 = company.get("offers_24_7")
+    service_count = company.get("service_count_estimated") or 0
+
+    if offers_24_7 is True:
+        score = min(35, score + 3)
+        factors.append("24/7 emergency service -- systemized operations, not a lifestyle business")
+
+    if service_count >= 5:
+        score = min(35, score + 3)
+        factors.append(f"{service_count} service lines -- diversified revenue, lower single-service churn risk")
+    elif service_count >= 3:
+        score = min(35, score + 1)
+        factors.append(f"{service_count} service lines -- moderate diversification")
 
     return min(score, 35), factors
 
@@ -186,6 +221,26 @@ def _platform_fit(company: dict) -> tuple:
         score += 2
         factors.append("Long tenure suggests recurring customer relationships and word-of-mouth pipeline")
 
+    # Content signal augmentation
+    is_recruiting = company.get("is_recruiting")
+    serves_commercial = company.get("serves_commercial")
+    tech_count = company.get("technician_count_estimated") or 0
+
+    if serves_commercial is True:
+        score = min(25, score + 4)
+        factors.append("Commercial HVAC services -- higher ACV, stronger PE roll-up fit")
+
+    if is_recruiting is True:
+        score = min(25, score + 3)
+        factors.append("Actively hiring technicians -- operational capacity for scale")
+
+    if tech_count >= 8:
+        score = min(25, score + 3)
+        factors.append(f"Team of {tech_count} technicians -- not founder-dependent, transferable")
+    elif tech_count >= 4:
+        score = min(25, score + 1)
+        factors.append(f"{tech_count} technicians -- small but scalable team in place")
+
     return min(score, 25), factors
 
 
@@ -198,6 +253,14 @@ def _generate_thesis(
     """Generate 3-6 bullet thesis points."""
     bullets = []
     name = company.get("name", "This company")
+
+    # Prefer content-derived thesis bullets when available
+    if company.get("is_family_owned_likely") and company.get("years_in_business_claimed"):
+        years = company["years_in_business_claimed"]
+        bullets.append(
+            f"Family-owned since {CURRENT_YEAR - years} ({years}yr) -- "
+            f"founding-generation operator, succession pressure confirmed on website"
+        )
 
     # Best 2 transition factors
     for f in trans_factors[:2]:
