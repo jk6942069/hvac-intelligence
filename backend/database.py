@@ -1,12 +1,26 @@
+import os
+import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from config import settings
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    connect_args={"check_same_thread": False},
-)
+logger = logging.getLogger(__name__)
+
+
+def _make_engine():
+    url = os.getenv("DATABASE_URL", settings.database_url)
+    is_sqlite = url.startswith("sqlite")
+    kwargs = {"echo": settings.debug}
+    if is_sqlite:
+        kwargs["connect_args"] = {"check_same_thread": False}
+    else:
+        # asyncpg pool sizing for Railway free tier (5 connections)
+        kwargs["pool_size"] = 5
+        kwargs["max_overflow"] = 10
+    return create_async_engine(url, **kwargs)
+
+
+engine = _make_engine()
 
 AsyncSessionLocal = async_sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
@@ -32,12 +46,14 @@ async def init_db():
 
 async def migrate_db():
     """
-    Idempotent column migrations for SQLite.
-    SQLAlchemy create_all won't add columns to existing tables,
-    so we run ALTER TABLE ADD COLUMN statements and swallow
-    'duplicate column' errors safely.
+    Idempotent column migrations for SQLite dev/test only.
+    In production (PostgreSQL), Alembic manages all schema changes.
     """
     from sqlalchemy import text
+    url = str(engine.url)
+    if "sqlite" not in url:
+        logger.info("Skipping migrate_db() — using PostgreSQL (Alembic manages schema)")
+        return
 
     migrations = [
         # v2 scoring columns
@@ -62,6 +78,11 @@ async def migrate_db():
         "ALTER TABLE companies ADD COLUMN discovery_source VARCHAR",
         "ALTER TABLE companies ADD COLUMN content_enriched BOOLEAN DEFAULT FALSE",
         "ALTER TABLE companies ADD COLUMN council_analyzed BOOLEAN DEFAULT FALSE",
+        # SaaS multi-tenancy columns (v4)
+        "ALTER TABLE companies ADD COLUMN user_id TEXT",
+        "ALTER TABLE pipeline_runs ADD COLUMN user_id TEXT",
+        "ALTER TABLE pipeline_runs ADD COLUMN cities TEXT",
+        "ALTER TABLE memos ADD COLUMN user_id TEXT",
     ]
 
     async with engine.connect() as conn:
@@ -73,7 +94,7 @@ async def migrate_db():
                 if "duplicate column name" not in str(e).lower():
                     raise
 
-        # Workflow state migration — remap old states to new acquisition pipeline states
+        # Workflow state migration
         try:
             await conn.execute(text("""
                 UPDATE companies SET workflow_status = CASE workflow_status
@@ -92,6 +113,4 @@ async def migrate_db():
             """))
             await conn.commit()
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Workflow migration: {e}")
