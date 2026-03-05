@@ -4,13 +4,19 @@ from typing import Optional, List
 
 class Settings(BaseSettings):
     # API Keys
-    google_places_api_key: str = ""
     anthropic_api_key: str = ""
     builtwith_api_key: Optional[str] = None
 
     # Real-data pipeline keys
     firecrawl_api_key: str = ""
     openrouter_api_key: str = ""
+
+    # Valuation assumption defaults (configurable, shown in UI)
+    valuation_ticket_size: int = 385          # Average HVAC ticket size in USD
+    valuation_jobs_per_review: int = 8        # Estimated jobs per Google review
+    valuation_ebitda_margin: float = 0.20     # HVAC EBITDA margin assumption
+    valuation_multiple_low: float = 3.5       # Acquisition multiple low end
+    valuation_multiple_high: float = 5.5      # Acquisition multiple high end
 
     # Council deliberation settings
     council_models: List[str] = ["anthropic/claude-sonnet-4-5", "openai/gpt-4o-mini", "google/gemini-flash-1.5"]
@@ -27,16 +33,12 @@ class Settings(BaseSettings):
     cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
     # Rate Limiting (ms between calls)
-    google_api_delay_ms: int = 200
     enrichment_delay_ms: int = 300
     claude_api_delay_ms: int = 1000
 
     # Processing
     batch_size: int = 5
     max_companies_per_run: int = 1000
-
-    # Demo mode – generates synthetic data when no API keys configured
-    use_mock_data: bool = True
 
     class Config:
         env_file = ".env"

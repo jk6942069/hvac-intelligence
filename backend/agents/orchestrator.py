@@ -10,7 +10,7 @@ from typing import Optional, Callable
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agents.scout import ScoutAgent, DEFAULT_CITIES
+from agents.scout import DEFAULT_CITIES
 from agents.enrichment import EnrichmentAgent
 from agents.signal_analyst import SignalAnalyst
 from agents.scoring_engine import ScoringEngine
@@ -117,7 +117,7 @@ class PipelineOrchestrator:
             num_cities = min(len(all_cities), max(1, max_companies // max_per_city + 1))
             target_cities = all_cities[:num_cities]
 
-            if settings.firecrawl_api_key and not getattr(settings, "use_mock_data", True):
+            if settings.firecrawl_api_key:
                 from agents.firecrawl_scout import FirecrawlScout
                 firecrawl_scout = FirecrawlScout(api_key=settings.firecrawl_api_key)
                 companies_raw = await firecrawl_scout.run_batch(
@@ -126,12 +126,15 @@ class PipelineOrchestrator:
                 )
                 logger.info(f"FirecrawlScout discovered {len(companies_raw)} companies")
             else:
-                scout = ScoutAgent()
-                companies_raw = await scout.run_batch(
+                # Free tier: OSMScout + YPScraper fallback (implemented in Task 4)
+                from agents.osm_scout import OSMScout
+                osm_scout = OSMScout()
+                companies_raw = await osm_scout.run_batch(
                     target_cities,
                     max_per_city=max_per_city,
                     progress_callback=lambda m, p: self._broadcast("scout", m, p * 0.18),
                 )
+                logger.info(f"OSMScout discovered {len(companies_raw)} companies")
             companies_raw = companies_raw[:max_companies]
             total = len(companies_raw)
             logger.info(f"Scout complete: {total} companies")
