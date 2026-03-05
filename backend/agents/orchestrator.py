@@ -91,6 +91,7 @@ class PipelineOrchestrator:
         max_companies: int = 200,
         generate_dossiers_for_top: int = 20,
         run_id: str = None,
+        user_id: str = None,
     ) -> str:
         if self.is_running:
             raise ValueError("A pipeline run is already in progress.")
@@ -104,6 +105,8 @@ class PipelineOrchestrator:
                 id=run_id,
                 status="running",
                 config_json={"max_companies": max_companies},
+                user_id=user_id,
+                cities=cities,
             )
             db.add(pr)
             await db.commit()
@@ -158,6 +161,13 @@ class PipelineOrchestrator:
 
                 logger.info(f"OSMScout+YP discovered {len(companies_raw)} companies")
             companies_raw = companies_raw[:max_companies]
+
+            # Stamp user_id on all discovered companies
+            if user_id:
+                for c in companies_raw:
+                    if isinstance(c, dict):
+                        c["user_id"] = user_id
+
             total = len(companies_raw)
             logger.info(f"Scout complete: {total} companies")
             await self._broadcast("scout", f"Found {total} HVAC companies", 0.18)
@@ -193,6 +203,7 @@ class PipelineOrchestrator:
                             category="HVAC",
                             status="scouted",
                             raw_google_data=c.get("raw_google_data"),
+                            user_id=c.get("user_id"),
                         ))
                 await db.commit()
 

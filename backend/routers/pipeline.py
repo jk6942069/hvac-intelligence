@@ -2,11 +2,12 @@
 import asyncio
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, BackgroundTasks, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
+from sqlalchemy import update as sql_update
 from pydantic import BaseModel
 from database import AsyncSessionLocal
-from models import PipelineRun
+from models import PipelineRun, User
 from auth import get_current_user, CurrentUser, get_current_user_ws
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,22 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 # Global state
 _orchestrator = None
 _ws_connections: list[WebSocket] = []
+
+PLAN_LIMITS = {
+    "starter": 10,
+    "professional": None,   # unlimited
+    "enterprise": None,     # unlimited
+}
+
+
+def check_scan_quota(user: CurrentUser):
+    """Raises HTTP 429 if user has exceeded their monthly scan quota."""
+    limit = PLAN_LIMITS.get(user.plan)
+    if limit is not None and user.scans_used_this_month >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Monthly scan limit of {limit} reached. Upgrade to Professional.",
+        )
 
 
 async def _broadcast_ws(message: dict):
@@ -55,9 +72,20 @@ async def start_pipeline(
     import uuid
     from agents.scout import DEFAULT_CITIES
 
+    check_scan_quota(user)
+
     orch = _get_orchestrator()
     if orch.is_running:
         return {"status": "already_running", "run_id": orch.current_run_id}
+
+    # Increment monthly scan counter
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            sql_update(User)
+            .where(User.id == user.user_id)
+            .values(scans_used_this_month=User.scans_used_this_month + 1)
+        )
+        await db.commit()
 
     # Resolve target cities
     target_cities = DEFAULT_CITIES
@@ -83,6 +111,7 @@ async def start_pipeline(
             max_companies=config.max_companies,
             generate_dossiers_for_top=config.generate_dossiers_for_top,
             run_id=run_id,
+            user_id=user.user_id,
         )
 
     background_tasks.add_task(_run)

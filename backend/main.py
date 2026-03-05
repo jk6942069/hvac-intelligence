@@ -20,6 +20,7 @@ from routers.dealdesk import router as dealdesk_router
 from routers.workflow import router as workflow_router
 from routers.comps import router as comps_router, seed_comps
 from routers.memos import router as memos_router
+from routers.billing import router as billing_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -106,9 +107,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = list(settings.cors_origins)
+if settings.cors_origin_prod:
+    _cors_origins.append(settings.cors_origin_prod)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -123,6 +128,7 @@ app.include_router(dealdesk_router, prefix="/api")
 app.include_router(workflow_router, prefix="/api")
 app.include_router(comps_router, prefix="/api")
 app.include_router(memos_router, prefix="/api")
+app.include_router(billing_router, prefix="/api/billing")
 
 
 @app.get("/api/health", tags=["system"])
