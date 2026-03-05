@@ -108,12 +108,11 @@
   /* Workflow status */
   .workflow-not_contacted { @apply bg-slate-500/10 text-slate-400 border border-slate-500/20; }
   .workflow-contacted { @apply bg-blue-500/10 text-blue-400 border border-blue-500/20; }
-  .workflow-responded { @apply bg-yellow-500/10 text-yellow-400 border border-yellow-500/20; }
-  .workflow-interested { @apply bg-green-500/10 text-green-400 border border-green-500/20; }
-  .workflow-not_interested { @apply bg-red-500/10 text-red-400 border border-red-500/20; }
-  .workflow-follow_up { @apply bg-orange-500/10 text-orange-400 border border-orange-500/20; }
-  .workflow-closed_lost { @apply bg-red-900/20 text-red-500 border border-red-900/30; }
-  .workflow-closed_won { @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .workflow-conversation_started { @apply bg-yellow-500/10 text-yellow-400 border border-yellow-500/20; }
+  .workflow-meeting_scheduled { @apply bg-green-500/10 text-green-400 border border-green-500/20; }
+  .workflow-under_review { @apply bg-orange-500/10 text-orange-400 border border-orange-500/20; }
+  .workflow-loi_considered { @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .workflow-passed { @apply bg-red-900/20 text-red-500 border border-red-900/30; }
 }
 
 /* Score bar gradient */

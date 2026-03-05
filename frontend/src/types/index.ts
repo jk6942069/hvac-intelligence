@@ -33,12 +33,21 @@ export interface ScoreExplanation {
 export type WorkflowStatus =
   | 'not_contacted'
   | 'contacted'
-  | 'responded'
-  | 'interested'
-  | 'not_interested'
-  | 'follow_up'
-  | 'closed_lost'
-  | 'closed_won'
+  | 'conversation_started'
+  | 'meeting_scheduled'
+  | 'under_review'
+  | 'loi_considered'
+  | 'passed'
+
+export const WORKFLOW_LABELS: Record<WorkflowStatus, string> = {
+  not_contacted:        'Not Contacted',
+  contacted:            'Contacted',
+  conversation_started: 'Conversation Started',
+  meeting_scheduled:    'Meeting Scheduled',
+  under_review:         'Under Review',
+  loi_considered:       'LOI Considered',
+  passed:               'Passed',
+}
 
 export interface WorkflowEvent {
   id: string

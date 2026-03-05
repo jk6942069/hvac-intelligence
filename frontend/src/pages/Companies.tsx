@@ -5,6 +5,8 @@ import {
   Search, Download, Star, Globe, ChevronUp, ChevronDown, ArrowUpDown, MapPin
 } from 'lucide-react'
 import { fetchCompanies } from '../api/client'
+import { WORKFLOW_LABELS } from '../types'
+import type { WorkflowStatus } from '../types'
 
 const scoreColor = (s: number) =>
   s >= 60 ? 'text-terminal-green' : s >= 40 ? 'text-terminal-amber' : 'text-terminal-red'
@@ -13,12 +15,6 @@ const scoreBg = (s: number) =>
   s >= 60 ? 'bg-terminal-green/10 text-terminal-green' :
   s >= 40 ? 'bg-terminal-amber/10 text-terminal-amber' :
   'bg-surface-600 text-slate-500'
-
-const WORKFLOW_LABELS: Record<string, string> = {
-  not_contacted: 'Not Contacted', contacted: 'Contacted', responded: 'Responded',
-  interested: 'Interested', not_interested: 'Not Interested', follow_up: 'Follow-Up',
-  closed_lost: 'Closed Lost', closed_won: 'Closed Won',
-}
 
 type SortCol = 'score' | 'name' | 'google_rating' | 'google_review_count' | 'domain_age_years'
 
@@ -166,7 +162,7 @@ export default function Companies() {
             )}
             {companies.map((c: any, i: number) => {
               const score = c.convictionScore ?? c.score ?? 0
-              const wfStatus = c.workflowStatus || 'not_contacted'
+              const wfStatus = (c.workflowStatus || 'not_contacted') as WorkflowStatus
               const topSig = (c.signals || []).find((s: any) => s.severity === 'high')
               return (
                 <tr

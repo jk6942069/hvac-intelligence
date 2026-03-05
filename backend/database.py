@@ -72,3 +72,26 @@ async def migrate_db():
             except Exception as e:
                 if "duplicate column name" not in str(e).lower():
                     raise
+
+        # Workflow state migration — remap old states to new acquisition pipeline states
+        try:
+            await conn.execute(text("""
+                UPDATE companies SET workflow_status = CASE workflow_status
+                    WHEN 'responded'      THEN 'contacted'
+                    WHEN 'interested'     THEN 'conversation_started'
+                    WHEN 'follow_up'      THEN 'conversation_started'
+                    WHEN 'closed_won'     THEN 'loi_considered'
+                    WHEN 'closed_lost'    THEN 'passed'
+                    WHEN 'not_interested' THEN 'passed'
+                    ELSE workflow_status
+                END
+                WHERE workflow_status IN (
+                    'responded','interested','follow_up',
+                    'closed_won','closed_lost','not_interested'
+                )
+            """))
+            await conn.commit()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Workflow migration: {e}")

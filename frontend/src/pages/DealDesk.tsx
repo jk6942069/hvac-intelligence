@@ -10,6 +10,7 @@ import {
   fetchDealFeed, fetchTop5, fetchTearsheet, updateWorkflow, generateMemo, fetchComps
 } from '../api/client'
 import type { Deal, WorkflowStatus, MemoItem } from '../types'
+import { WORKFLOW_LABELS as WORKFLOW_LABELS_FROM_TYPES } from '../types'
 import ReactMarkdown from 'react-markdown'
 
 const fmtDollar = (n: number) =>
@@ -24,16 +25,7 @@ const scoreBg = (s: number) =>
   s >= 40 ? 'bg-terminal-amber/10 border-terminal-amber/20' :
   'bg-terminal-red/10 border-terminal-red/20'
 
-const WORKFLOW_LABELS: Record<string, string> = {
-  not_contacted: 'Not Contacted',
-  contacted: 'Contacted',
-  responded: 'Responded',
-  interested: 'Interested',
-  not_interested: 'Not Interested',
-  follow_up: 'Follow-Up',
-  closed_lost: 'Closed Lost',
-  closed_won: 'Closed Won',
-}
+const WORKFLOW_LABELS: Record<string, string> = WORKFLOW_LABELS_FROM_TYPES
 
 const WORKFLOW_STATUSES = Object.keys(WORKFLOW_LABELS) as WorkflowStatus[]
 
