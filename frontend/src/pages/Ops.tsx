@@ -42,14 +42,19 @@ export default function Ops() {
 
   useEffect(() => {
     if (!running) return
-    const ws = createPipelineSocket((data) => {
+    let ws: WebSocket | null = null
+    createPipelineSocket((data) => {
       const msg = (data as any).message || JSON.stringify(data)
       setWsMessages(prev => [...prev.slice(-49), msg])
       if ((data as any).status === 'completed' || (data as any).status === 'failed') {
         setRunning(false)
       }
+    }).then(socket => {
+      ws = socket
     })
-    return () => ws.close()
+    return () => {
+      ws?.close()
+    }
   }, [running])
 
   const isRunning = status?.isRunning || running

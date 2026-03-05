@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { supabase } from '../lib/supabase'
 import type {
   Deal,
   DealFeedResponse,
@@ -11,7 +12,20 @@ import type {
   WorkflowStatus,
 } from '../types'
 
-const api = axios.create({ baseURL: '/api', timeout: 30_000 })
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
+  timeout: 30_000,
+})
+
+// Attach Supabase JWT to every request
+api.interceptors.request.use(async (config) => {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 // --- Deal Desk ---
 export interface DealFeedParams {
@@ -131,13 +145,29 @@ export const updateConfig = (config: {
 }) => api.put('/config', config).then(r => r.data)
 
 // --- WebSocket ---
-export const createPipelineSocket = (
+export const createPipelineSocket = async (
   onMessage: (data: Record<string, unknown>) => void,
   onClose?: () => void
-): WebSocket => {
+): Promise<WebSocket> => {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token ?? ''
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const ws = new WebSocket(`${proto}//${window.location.host}/api/pipeline/ws`)
+  const apiBase = import.meta.env.VITE_API_URL ?? ''
+  const wsHost = apiBase
+    ? new URL(apiBase.replace(/^https?/, 'ws')).host
+    : window.location.host
+  const ws = new WebSocket(`${proto}//${wsHost}/api/pipeline/ws?token=${token}`)
   ws.onmessage = e => { try { onMessage(JSON.parse(e.data)) } catch { } }
   ws.onclose = onClose ?? (() => {})
   return ws
 }
+
+// --- Billing ---
+export const fetchBillingStatus = () =>
+  api.get('/billing/status').then(r => r.data)
+
+export const createCheckout = (plan: 'starter' | 'professional') =>
+  api.post('/billing/create-checkout', { plan }).then(r => r.data)
+
+export const openBillingPortal = () =>
+  api.post('/billing/portal').then(r => r.data)

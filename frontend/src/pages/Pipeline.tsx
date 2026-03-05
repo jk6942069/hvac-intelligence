@@ -122,7 +122,7 @@ export default function Pipeline() {
   // WebSocket
   useEffect(() => {
     const connect = () => {
-      const ws = createPipelineSocket(
+      createPipelineSocket(
         (data) => {
           const msg = data as unknown as LiveMessage
           if (msg.type === 'progress') {
@@ -146,8 +146,9 @@ export default function Pipeline() {
           }
         },
         () => setTimeout(connect, 3000)
-      )
-      wsRef.current = ws
+      ).then(socket => {
+        wsRef.current = socket
+      })
     }
     connect()
     return () => wsRef.current?.close()

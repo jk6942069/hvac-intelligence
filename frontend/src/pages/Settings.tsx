@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, Save } from 'lucide-react'
-import { fetchConfig, updateConfig } from '../api/client'
+import { fetchConfig, updateConfig, fetchBillingStatus, createCheckout, openBillingPortal } from '../api/client'
 
 export default function Settings() {
   const qc = useQueryClient()
@@ -40,6 +40,21 @@ export default function Settings() {
       setTimeout(() => setSaved(false), 2500)
     },
   })
+
+  const { data: billing } = useQuery({
+    queryKey: ['billing-status'],
+    queryFn: fetchBillingStatus,
+  })
+
+  const handleUpgrade = async (plan: 'starter' | 'professional') => {
+    const { url } = await createCheckout(plan)
+    window.location.href = url
+  }
+
+  const handleManageBilling = async () => {
+    const { url } = await openBillingPortal()
+    window.location.href = url
+  }
 
   const handleSaveKeys = () => {
     const payload: Record<string, string> = {}
@@ -235,6 +250,58 @@ export default function Settings() {
         <p className="text-slate-600 text-xs mt-2">
           Email and webhook notifications for pipeline completion and new high-conviction targets.
         </p>
+      </div>
+
+      {/* Billing Card */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Subscription</h2>
+        {billing ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white font-medium">{billing.planDisplay?.name}</div>
+                <div className="text-gray-400 text-sm">{billing.planDisplay?.price}</div>
+              </div>
+              <span className="px-3 py-1 bg-blue-600/20 text-blue-400 rounded-full text-xs font-medium uppercase tracking-wide">
+                {billing.plan}
+              </span>
+            </div>
+            {billing.scansLimit && (
+              <div>
+                <div className="flex justify-between text-sm text-gray-400 mb-1.5">
+                  <span>Monthly scans</span>
+                  <span>{billing.scansUsed} / {billing.scansLimit}</span>
+                </div>
+                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, (billing.scansUsed / billing.scansLimit) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3 pt-2">
+              {billing.plan === 'starter' && (
+                <button
+                  onClick={() => handleUpgrade('professional')}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-2 px-4 transition-colors"
+                >
+                  Upgrade to Professional — $149/mo
+                </button>
+              )}
+              {billing.plan !== 'starter' && (
+                <button
+                  onClick={handleManageBilling}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg py-2 px-4 transition-colors"
+                >
+                  Manage Billing
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="text-gray-500 text-sm">Loading billing info…</div>
+        )}
       </div>
 
       {/* Advanced Integrations */}
