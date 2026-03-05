@@ -90,7 +90,7 @@ function ScreenerPanel({ filters, onChange, total }: {
   return (
     <div className="w-52 shrink-0 flex flex-col h-full border-r border-surface-600 bg-navy-800">
       <div className="px-4 py-3 border-b border-surface-600">
-        <div className="terminal-label text-[10px] mb-2">DEAL SCREENER</div>
+        <div className="terminal-label text-[10px] mb-2">DEAL FILTER</div>
         <input
           type="text"
           placeholder="Search targets..."
@@ -132,7 +132,7 @@ function ScreenerPanel({ filters, onChange, total }: {
           </select>
         </div>
         <div className="pt-2 border-t border-surface-600">
-          <div className="terminal-label text-[10px]">MATCHING TARGETS</div>
+          <div className="terminal-label text-[10px]">TARGETS</div>
           <div className="font-mono text-lg text-accent font-semibold">{total}</div>
         </div>
       </div>
@@ -167,6 +167,12 @@ function DealFeedItem({ deal, selected, onClick, index }: { deal: Deal; selected
           {deal.googleReviewCount != null && <span className="text-xs text-slate-500 font-mono">{deal.googleReviewCount}rev</span>}
           {deal.domainAgeYears != null && <span className="text-xs text-slate-500 font-mono">{Math.round(deal.domainAgeYears)}yr</span>}
           <WorkflowBadge status={deal.workflowStatus} />
+          {deal.councilAnalyzed && (
+            <span className="text-[10px] font-mono text-accent/70">&#x2696;</span>
+          )}
+          {deal.discoverySource === "firecrawl_search" && (
+            <span className="text-[10px] font-mono text-slate-600">live</span>
+          )}
         </div>
         {deal.thesisBullets?.[0] && <div className="mt-1.5 text-xs text-slate-500 leading-snug line-clamp-1 italic">{deal.thesisBullets[0]}</div>}
       </div>
@@ -277,6 +283,17 @@ function DecisionPane({ deal, onWorkflowUpdate }: {
       <div className="flex-1 overflow-y-auto p-5">
         {activeTab === "thesis" && (
           <div className="space-y-5">
+            {/* Council consensus badge */}
+            {activeDeal?.councilAnalyzed && (
+              <div className="glass-card p-3 border-accent/30 bg-accent/5">
+                <div className="flex items-center gap-2">
+                  <span className="text-accent text-xs font-mono font-semibold">&#x2696; COUNCIL ANALYSIS</span>
+                  <span className="text-xs text-slate-500 ml-auto font-mono">3-model deliberation complete</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">View the full council investment thesis in the Memo tab.</p>
+              </div>
+            )}
+            {/* existing thesis content follows */}
             <div className="glass-card p-4 border-accent/20 bg-accent/5">
               <div className="terminal-label text-[10px] mb-2 text-accent">RECOMMENDED ACTION</div>
               <p className="text-sm text-slate-200 font-medium">{activeDeal?.recommendedAction}</p>
@@ -468,7 +485,12 @@ function DecisionPane({ deal, onWorkflowUpdate }: {
         {activeTab === "memo" && (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <div className="terminal-label text-[10px]">INVESTMENT MEMO</div>
+              <div className="terminal-label text-[10px] flex items-center gap-2">
+                INVESTMENT MEMO
+                {(tearsheet as any)?.memos?.[0]?.modelUsed === "council-v1" && (
+                  <span className="text-accent text-[10px] font-mono">&#x2696; COUNCIL</span>
+                )}
+              </div>
               <button
                 onClick={() => {
                   setGeneratingMemo(true)
@@ -679,6 +701,7 @@ export default function DealDesk() {
 
   const deals = feedData?.deals || []
   const total = feedData?.total || 0
+  const councilCount = deals.filter((d: any) => d.councilAnalyzed).length
 
   const workflowMutation = useMutation({
     mutationFn: ({ id, status, notes }: { id: string; status: WorkflowStatus; notes?: string }) =>
@@ -700,7 +723,7 @@ export default function DealDesk() {
         <div className="px-4 py-3 border-b border-surface-600 flex items-center justify-between shrink-0">
           <div>
             <div className="terminal-label text-[10px]">DEAL FEED</div>
-            <div className="text-xs text-slate-400 font-mono mt-0.5">{total} targets ranked</div>
+            <div className="text-xs text-slate-400 font-mono mt-0.5">{`${total} ranked · ${councilCount} council-reviewed`}</div>
           </div>
           <button onClick={() => refetch()} className="btn-ghost p-1.5">
             <RefreshCw size={13} className={isLoading ? "animate-spin text-accent" : ""} />

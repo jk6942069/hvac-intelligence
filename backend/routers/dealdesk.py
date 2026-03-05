@@ -1,4 +1,5 @@
 """Deal Desk API -- primary investor-facing ranked feed."""
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, and_, or_
@@ -54,6 +55,17 @@ def company_to_deal(c: Company, has_dossier: bool = False, has_memo: bool = Fals
         "workflowNotes": c.workflow_notes,
         "outreachDate": c.outreach_date,
         "lastContactDate": c.last_contact_date,
+        # Content enrichment fields
+        "isFamilyOwnedLikely": c.is_family_owned_likely,
+        "offers247": c.offers_24_7,
+        "serviceCountEstimated": c.service_count_estimated,
+        "yearsInBusinessClaimed": c.years_in_business_claimed,
+        "isRecruiting": c.is_recruiting,
+        "technicianCountEstimated": c.technician_count_estimated,
+        "servesCommercial": c.serves_commercial,
+        "discoverySource": c.discovery_source,
+        "contentEnriched": c.content_enriched or False,
+        "councilAnalyzed": c.council_analyzed or False,
         # Meta
         "status": c.status,
         "rank": c.rank,
@@ -181,6 +193,12 @@ async def tearsheet(company_id: str, db: AsyncSession = Depends(get_db)):
     )
     memos = m_res.scalars().all()
 
+    # Sort memos: council-v1 first, then by generated_at desc
+    memos_sorted = sorted(
+        memos,
+        key=lambda m: (0 if getattr(m, "model_used", "") == "council-v1" else 1, -(getattr(m, "generated_at") or datetime.min).timestamp()),
+    )
+
     # Workflow events
     from models import WorkflowEvent
     we_res = await db.execute(
@@ -193,7 +211,7 @@ async def tearsheet(company_id: str, db: AsyncSession = Depends(get_db)):
 
     explanation = c.score_explanation or {}
     return {
-        **company_to_deal(c, dossier is not None, len(memos) > 0),
+        **company_to_deal(c, dossier is not None, len(memos_sorted) > 0),
         # Snapshot extras
         "email": c.email,
         "googlePlaceId": c.google_place_id,
@@ -215,9 +233,10 @@ async def tearsheet(company_id: str, db: AsyncSession = Depends(get_db)):
                 "version": m.version,
                 "title": m.title,
                 "status": m.status,
+                "modelUsed": m.model_used,
                 "updatedAt": m.updated_at.isoformat() if m.updated_at else None,
             }
-            for m in memos
+            for m in memos_sorted
         ],
         # Workflow events
         "workflowEvents": [
