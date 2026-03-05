@@ -5,6 +5,7 @@ import type {
   DashboardStats,
   CompDeal,
   MemoItem,
+  DossierItem,
   PipelineStatus,
   PipelineRun,
   WorkflowStatus,
@@ -94,6 +95,13 @@ export const updateMemo = (memoId: string, content: string, title?: string): Pro
 // --- Dossiers ---
 export const generateDossier = (companyId: string): Promise<void> =>
   api.post(`/dossiers/${companyId}/generate`).then(r => r.data)
+
+export const fetchDossiers = (page: number = 1, limit: number = 50): Promise<{ dossiers: DossierItem[]; total: number; pages: number }> =>
+  api.get('/dossiers', { params: { page, limit } }).then(r => r.data)
+
+// --- Feedback ---
+export const submitFeedback = (companyId: string, outcome: string, notes: string): Promise<void> =>
+  api.put(`/companies/${companyId}/feedback`, { outcome, notes }).then(r => r.data)
 
 // --- Pipeline ---
 export interface RunPipelineParams {

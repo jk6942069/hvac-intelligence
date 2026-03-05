@@ -10,6 +10,7 @@ import clsx from 'clsx'
 import { fetchCompany, submitFeedback, generateDossier } from '../api/client'
 import ScoreBar from '../components/ScoreBar'
 import SignalBadge from '../components/SignalBadge'
+import MemoExport from '../components/MemoExport'
 
 const FEEDBACK_OPTIONS = [
   { value: 'responded', label: 'Owner Responded', cls: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' },
@@ -299,6 +300,16 @@ export default function CompanyDetail() {
 
             {hasDossier ? (
               <div className="dossier-content prose prose-invert max-w-none">
+                {company.dossier?.content && (
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="terminal-label text-[10px]">INVESTMENT MEMO</div>
+                    <MemoExport
+                      memoContent={company.dossier.content}
+                      companyName={company?.name || 'company'}
+                      memoId={company.dossier?.id}
+                    />
+                  </div>
+                )}
                 <ReactMarkdown>{company.dossier!.content}</ReactMarkdown>
                 <div className="mt-6 pt-4 border-t border-surface-700 flex items-center gap-2 text-slate-600 text-xs">
                   <Clock className="w-3.5 h-3.5" />
