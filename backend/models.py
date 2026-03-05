@@ -8,6 +8,25 @@ def generate_id():
     return str(uuid.uuid4())
 
 
+class User(Base):
+    """App-level user — bridges Supabase auth.uid() with plan/billing state."""
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True)           # = Supabase auth.uid()
+    email = Column(String)                           # cached copy from JWT
+    plan = Column(String, nullable=False, default="starter")  # starter / professional / enterprise
+    stripe_customer_id = Column(String)
+    stripe_subscription_id = Column(String)
+    scans_used_this_month = Column(Integer, nullable=False, default=0)
+    scans_reset_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("plan", "starter")
+        kwargs.setdefault("scans_used_this_month", 0)
+        super().__init__(**kwargs)
+
+
 class Company(Base):
     __tablename__ = "companies"
 
@@ -19,7 +38,7 @@ class Company(Base):
     phone = Column(String)
     website = Column(String)
     email = Column(String)
-    google_place_id = Column(String, unique=True, index=True)
+    google_place_id = Column(String, index=True)   # not unique — two users can have same company
     google_rating = Column(Float)
     google_review_count = Column(Integer)
     category = Column(String, default="HVAC")
@@ -86,6 +105,9 @@ class Company(Base):
     # Raw data
     raw_google_data = Column(JSON)
 
+    # Multi-tenancy
+    user_id = Column(String, index=True)  # FK to users.id — set on insert, nullable for legacy data
+
 
 class PipelineRun(Base):
     __tablename__ = "pipeline_runs"
@@ -99,6 +121,8 @@ class PipelineRun(Base):
     current_stage = Column(String, default="initializing")
     error = Column(Text)
     config_json = Column(JSON)
+    user_id = Column(String, index=True)
+    cities = Column(JSON)   # list of "City, ST" strings
 
 
 class Dossier(Base):
@@ -124,6 +148,7 @@ class Memo(Base):
     generated_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     model_used = Column(String, default="claude-3-5-sonnet-20241022")
+    user_id = Column(String, index=True)
 
 
 class WorkflowEvent(Base):
