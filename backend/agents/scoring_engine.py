@@ -410,13 +410,60 @@ class ScoringEngine:
     def __init__(self, learned_weights: dict = None):
         self.learned_weights = learned_weights or {}
 
+    @staticmethod
+    def _risk_adjustment(company: dict) -> tuple[int, list[str]]:
+        """Score 0-20. Starts at 20, deductions for risk signals."""
+        score = 20
+        factors: list[str] = []
+
+        website = company.get("website")
+        website_active = company.get("website_active")
+        has_website = bool(website) or (website_active is True)
+        if not has_website:
+            score -= 8
+            factors.append("No website")
+        elif not website_active:
+            score -= 5
+            factors.append("Website offline")
+
+        reviews = company.get("google_review_count") or 0
+        if reviews < 10:
+            score -= 6
+            factors.append("Fewer than 10 reviews")
+        elif reviews < 25:
+            score -= 3
+            factors.append("Limited review count (<25)")
+
+        rating = company.get("google_rating") or 0.0
+        if 0 < rating < 3.5:
+            score -= 5
+            factors.append(f"Below-3.5\u2605 rating ({rating}\u2605)")
+
+        if not company.get("ssl_valid"):
+            score -= 3
+            factors.append("No SSL certificate")
+
+        if not company.get("has_facebook") and not company.get("has_instagram"):
+            score -= 2
+            factors.append("No social media presence")
+
+        return max(0, score), factors
+
     def score(self, company: dict) -> tuple:
-        """Return (conviction_score 0-100, full_explanation_dict)."""
+        """Return (conviction_score 0-100, breakdown, trans_score, quality_score, platform_score, explanation)."""
         trans_score, trans_factors = _transition_pressure(company)
         quality_score, quality_factors = _business_quality(company)
         platform_score, platform_factors = _platform_fit(company)
+        risk_score, risk_factors = self._risk_adjustment(company)
 
-        conviction = trans_score + quality_score + platform_score
+        # Map old 3D scores to new 5D labels for UI display
+        op_score = trans_score // 4                    # operational signals (~25% of transition score)
+        longevity_score = trans_score - op_score       # ensures op_score + longevity_score == trans_score
+        market_score = platform_score                  # Platform Fit -> Market Strength
+        reputation_score = quality_score               # Business Quality -> Customer Reputation
+
+        conviction = trans_score + quality_score + platform_score + risk_score
+        conviction = min(100, conviction)
 
         # Sub-score breakdown for legacy compatibility
         breakdown = {
@@ -442,10 +489,18 @@ class ScoringEngine:
             "keyRisks": risks,
             "valuationBand": valuation,
             "recommendedAction": action,
+            "riskFactors": risk_factors,
             "subscores": {
+                # Legacy keys (kept for backward compat with existing DB records)
                 "transition": trans_score,
                 "quality": quality_score,
                 "platform": platform_score,
+                # New 5-dimension keys (used by v2 UI)
+                "market": market_score,
+                "reputation": reputation_score,
+                "longevity": longevity_score,
+                "operational": op_score,
+                "risk": risk_score,
             },
         }
 
