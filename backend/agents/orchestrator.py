@@ -240,7 +240,7 @@ class PipelineOrchestrator:
                     )
                 await db.commit()
 
-            await self._broadcast("content_enrich", f"Content signals saved for {len(companies_after_content)} companies", 0.52)
+            await self._broadcast("content_enrich", f"Content stage complete ({len(companies_after_content)} companies)", 0.52)
 
             # ─── STAGE 3: Signal Analysis ────────────────────────────────
             await self._broadcast("signals", "Analyzing transition signals…", 0.52)
@@ -295,7 +295,12 @@ class PipelineOrchestrator:
                         0.77,
                     )
                     council_agent = CouncilAgent(api_key=settings.openrouter_api_key)
-                    council_results = await council_agent.analyze_batch(qualified)
+                    council_results = await council_agent.analyze_batch(
+                        qualified,
+                        progress_callback=lambda m, p: asyncio.ensure_future(
+                            self._broadcast("council", m, 0.77 + p * 0.15)
+                        ),
+                    )
 
                     async with AsyncSessionLocal() as db:
                         for company_id, thesis in council_results:
@@ -332,7 +337,7 @@ class PipelineOrchestrator:
                 logger.info("Council stage skipped — no OPENROUTER_API_KEY")
                 await self._broadcast("council", "Council stage skipped (configure OPENROUTER_API_KEY to enable)", 0.92)
 
-            # ─── STAGE 6: Dossiers ───────────────────────────────────────
+            # ─── STAGE 8: Dossiers ───────────────────────────────────────
             top = [c for c in companies_ranked if c.get("status") == "top_candidate"]
             top = top[:generate_dossiers_for_top]
             await self._broadcast("dossiers", f"Writing dossiers for {len(top)} top targets…", 0.92)
