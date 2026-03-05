@@ -247,7 +247,7 @@ class CouncilAgent:
     async def _stage3(self, brief: str, stage1: list[dict], stage2: list[dict]) -> str:
         """Stage 3: Chairman synthesizes final thesis from all inputs."""
         formatted_s1 = "\n\n".join(
-            f"Analyst {r['label']} ({r['model']}):\n{r['response']}" for r in stage1
+            f"Analyst {r['label']}:\n{r['response']}" for r in stage1
         )
         formatted_s2 = "\n\n".join(
             f"Reviewer {r['model']}:\n{r['review']}" for r in stage2
@@ -279,6 +279,8 @@ class CouncilAgent:
             stage1 = await self._stage1(brief)
             stage2 = await self._stage2(brief, stage1)
             chairman_output = await self._stage3(brief, stage1, stage2)
+            if not chairman_output or not chairman_output.strip():
+                return fallback
             return parse_chairman_output(chairman_output)
         except Exception as e:
             logger.error(f"Council analysis failed for {company.get('name')}: {e}")
@@ -293,13 +295,19 @@ class CouncilAgent:
         Analyze multiple companies concurrently (bounded concurrency to
         respect OpenRouter rate limits). Returns list of (company_id, thesis) tuples.
         """
-        semaphore = asyncio.Semaphore(3)  # Max 3 concurrent council runs
+        # Semaphore limits to 3 concurrent council runs.
+        # Each run = 9 API calls (3 models × 3 stages) = 27 max simultaneous requests.
+        # Adjust down to 2 if hitting OpenRouter rate limits in production.
+        semaphore = asyncio.Semaphore(3)
 
         async def analyze_with_sem(company):
             async with semaphore:
                 result = await self.analyze(company)
                 if progress_callback:
-                    await progress_callback(f"Council reviewed: {company.get('name')}", 0)
-                return (company["id"], result)
+                    if asyncio.iscoroutinefunction(progress_callback):
+                        await progress_callback(f"Council reviewed: {company.get('name')}", 0)
+                    else:
+                        progress_callback(f"Council reviewed: {company.get('name')}", 0)
+                return (company.get("id", ""), result)
 
         return await asyncio.gather(*[analyze_with_sem(c) for c in companies])
