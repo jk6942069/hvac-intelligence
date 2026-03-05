@@ -69,6 +69,6 @@ async def migrate_db():
             try:
                 await conn.execute(text(sql))
                 await conn.commit()
-            except Exception:
-                # Column already exists — safe to ignore
-                pass
+            except Exception as e:
+                if "duplicate column name" not in str(e).lower():
+                    raise

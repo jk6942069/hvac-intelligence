@@ -46,8 +46,8 @@ class Company(Base):
     technician_count_estimated = Column(Integer, nullable=True)
     serves_commercial = Column(Boolean, nullable=True)
     discovery_source = Column(String, nullable=True)   # "firecrawl_search" | "yellowpages" | "mock"
-    content_enriched = Column(Boolean, default=False)
-    council_analyzed = Column(Boolean, default=False)
+    content_enriched = Column(Boolean, nullable=False, default=False)
+    council_analyzed = Column(Boolean, nullable=False, default=False)
 
     # Signals (JSON array of signal objects)
     signals = Column(JSON, default=list)
