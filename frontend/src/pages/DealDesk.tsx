@@ -701,7 +701,7 @@ export default function DealDesk() {
 
   const deals = feedData?.deals || []
   const total = feedData?.total || 0
-  const councilCount = deals.filter((d: any) => d.councilAnalyzed).length
+  const councilCount = deals.filter(d => d.councilAnalyzed).length
 
   const workflowMutation = useMutation({
     mutationFn: ({ id, status, notes }: { id: string; status: WorkflowStatus; notes?: string }) =>
