@@ -456,14 +456,36 @@ class ScoringEngine:
         platform_score, platform_factors = _platform_fit(company)
         risk_score, risk_factors = self._risk_adjustment(company)
 
-        # Map old 3D scores to new 5D labels for UI display
+        raw_total = trans_score + quality_score + platform_score + risk_score
+
+        if raw_total > 100:
+            # Scale each subscore proportionally so they sum to 100
+            scale = 100 / raw_total
+            trans_score = round(trans_score * scale)
+            quality_score = round(quality_score * scale)
+            platform_score = round(platform_score * scale)
+            risk_score = round(risk_score * scale)
+            # Fix rounding error: adjust the largest subscore to ensure exact sum of 100
+            current_sum = trans_score + quality_score + platform_score + risk_score
+            if current_sum != 100:
+                # Add/subtract the difference from the largest score
+                largest_idx = max(
+                    range(4),
+                    key=lambda i: [trans_score, quality_score, platform_score, risk_score][i]
+                )
+                adjustments = [trans_score, quality_score, platform_score, risk_score]
+                adjustments[largest_idx] += 100 - current_sum
+                trans_score, quality_score, platform_score, risk_score = adjustments
+
+        conviction = trans_score + quality_score + platform_score + risk_score
+        # conviction now equals exactly 100 if it was capped, or the raw total if under 100
+        # No min(100, ...) needed — it's already capped via scaling
+
+        # Recompute the 5D breakdown from the (possibly scaled) 3D scores
         op_score = trans_score // 4                    # operational signals (~25% of transition score)
         longevity_score = trans_score - op_score       # ensures op_score + longevity_score == trans_score
         market_score = platform_score                  # Platform Fit -> Market Strength
         reputation_score = quality_score               # Business Quality -> Customer Reputation
-
-        conviction = trans_score + quality_score + platform_score + risk_score
-        conviction = min(100, conviction)
 
         # Sub-score breakdown for legacy compatibility
         breakdown = {

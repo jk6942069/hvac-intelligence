@@ -98,3 +98,29 @@ def test_emergency_service_detected_in_signals_adds_to_operational():
     _, _, _, _, _, exp_no = engine.score(company_no)
     _, _, _, _, _, exp_yes = engine.score(company_yes)
     assert exp_yes["subscores"]["operational"] >= exp_no["subscores"]["operational"]
+
+
+def test_conviction_cap_preserves_sum_invariant():
+    """When conviction would exceed 100, subscores are scaled and still sum correctly."""
+    engine = ScoringEngine()
+    # Build a maximally scoring company to trigger the cap
+    maxed = _base_company(
+        state="AZ",  # Sun Belt bonus
+        google_rating=4.9,
+        google_review_count=500,
+        domain_age_years=25.0,
+        ssl_valid=True,
+        website_active=True,
+        website="https://example.com",
+        has_facebook=True,
+        has_instagram=True,
+        is_family_owned_likely=True,
+        years_in_business_claimed=30,
+        offers_24_7=True,
+        technician_count_estimated=10,
+    )
+    conviction, _, _, _, _, explanation = engine.score(maxed)
+    subs = explanation["subscores"]
+    expected_sum = subs["market"] + subs["reputation"] + subs["longevity"] + subs["operational"] + subs["risk"]
+    assert conviction == expected_sum, f"conviction={conviction} but subscore sum={expected_sum}"
+    assert conviction <= 100
