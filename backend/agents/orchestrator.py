@@ -135,7 +135,7 @@ class PipelineOrchestrator:
             companies_raw = companies_raw[:max_companies]
             total = len(companies_raw)
             logger.info(f"Scout complete: {total} companies")
-            await self._broadcast("scout", f"Found {total} HVAC companies", 0.20)
+            await self._broadcast("scout", f"Found {total} HVAC companies", 0.18)
             await self._save_run(run_id, current_stage="scout_complete", total_companies=total)
 
             # ─── Persist initial records ─────────────────────────────────
@@ -172,12 +172,12 @@ class PipelineOrchestrator:
                 await db.commit()
 
             # ─── STAGE 2: Enrich ─────────────────────────────────────────
-            await self._broadcast("enrich", "Enriching company data…", 0.20)
+            await self._broadcast("enrich", "Enriching company data…", 0.18)
             enricher = EnrichmentAgent()
             try:
                 companies_enriched = await enricher.enrich_batch(
                     companies_raw,
-                    progress_callback=lambda m, p: self._broadcast("enrich", m, 0.20 + p * 0.20),
+                    progress_callback=lambda m, p: self._broadcast("enrich", m, 0.18 + p * 0.22),
                 )
             finally:
                 await enricher.close()
@@ -205,12 +205,12 @@ class PipelineOrchestrator:
             await self._broadcast("enrich", f"Enriched {len(companies_enriched)} companies", 0.40)
 
             # ─── STAGE 2.5: Content Enrichment ──────────────────────────
-            await self._broadcast("content_enrich", "Extracting website content signals…", 0.42)
+            await self._broadcast("content_enrich", "Extracting website content signals…", 0.40)
             if settings.firecrawl_api_key:
                 content_agent = ContentEnrichmentAgent(api_key=settings.firecrawl_api_key)
                 companies_after_content = await content_agent.enrich_batch(
                     companies_enriched,
-                    progress_callback=None,
+                    progress_callback=lambda m, p: self._broadcast("content_enrich", m, 0.40 + p * 0.12),
                 )
                 await self._broadcast(
                     "content_enrich",
@@ -249,7 +249,7 @@ class PipelineOrchestrator:
             await self._broadcast("signals", "Signal analysis complete", 0.58)
 
             # ─── STAGE 4: Scoring ────────────────────────────────────────
-            await self._broadcast("scoring", "Scoring acquisition probability…", 0.55)
+            await self._broadcast("scoring", "Scoring acquisition probability…", 0.58)
             scorer = ScoringEngine()
             companies_scored = scorer.score_batch(companies_signals)
             await self._broadcast("scoring", "Scoring complete", 0.65)
@@ -277,7 +277,7 @@ class PipelineOrchestrator:
                     )
                 await db.commit()
 
-            await self._broadcast("ranking", f"Ranked {len(companies_ranked)} companies", 0.75)
+            await self._broadcast("ranking", f"Ranked {len(companies_ranked)} companies", 0.76)
 
             # ─── STAGE 7: Council Analysis ──────────────────────────────
             await self._broadcast("council", "Qualifying candidates for council review…", 0.76)
@@ -335,12 +335,12 @@ class PipelineOrchestrator:
             # ─── STAGE 6: Dossiers ───────────────────────────────────────
             top = [c for c in companies_ranked if c.get("status") == "top_candidate"]
             top = top[:generate_dossiers_for_top]
-            await self._broadcast("dossiers", f"Writing dossiers for {len(top)} top targets…", 0.75)
+            await self._broadcast("dossiers", f"Writing dossiers for {len(top)} top targets…", 0.92)
 
             dossier_gen = DossierGenerator()
             dossier_results = await dossier_gen.generate_batch(
                 top,
-                progress_callback=lambda m, p: self._broadcast("dossiers", m, 0.75 + p * 0.22),
+                progress_callback=lambda m, p: self._broadcast("dossiers", m, 0.92 + p * 0.05),
             )
 
             async with AsyncSessionLocal() as db:
