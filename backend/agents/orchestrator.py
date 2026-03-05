@@ -126,15 +126,37 @@ class PipelineOrchestrator:
                 )
                 logger.info(f"FirecrawlScout discovered {len(companies_raw)} companies")
             else:
-                # Free tier: OSMScout + YPScraper fallback (implemented in Task 4)
+                # Free tier: OSMScout + YPScraper fallback for sparse cities
                 from agents.osm_scout import OSMScout
+                from agents.yp_scraper import YPScraper, OSM_FALLBACK_THRESHOLD
+
                 osm_scout = OSMScout()
+                yp_scraper = YPScraper()
+
+                # OSM batch run
                 companies_raw = await osm_scout.run_batch(
                     target_cities,
                     max_per_city=max_per_city,
-                    progress_callback=lambda m, p: self._broadcast("scout", m, p * 0.18),
+                    progress_callback=lambda m, p: asyncio.create_task(
+                        self._broadcast("scout", m, p * 0.18)
+                    ),
                 )
-                logger.info(f"OSMScout discovered {len(companies_raw)} companies")
+
+                # YP fallback: supplement any city where OSM found < threshold
+                # (check per city by running YP for each if total is sparse)
+                if len(companies_raw) < OSM_FALLBACK_THRESHOLD * len(target_cities):
+                    logger.info(
+                        f"OSM total {len(companies_raw)} is sparse — running YP fallback"
+                    )
+                    seen_place_ids = {c["place_id"] for c in companies_raw}
+                    for city, state in target_cities:
+                        yp_results = await yp_scraper.search_city(city, state, max_results=max_per_city)
+                        for c in yp_results:
+                            if c["place_id"] not in seen_place_ids:
+                                seen_place_ids.add(c["place_id"])
+                                companies_raw.append(c)
+
+                logger.info(f"OSMScout+YP discovered {len(companies_raw)} companies")
             companies_raw = companies_raw[:max_companies]
             total = len(companies_raw)
             logger.info(f"Scout complete: {total} companies")
