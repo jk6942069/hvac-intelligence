@@ -299,15 +299,21 @@ class CouncilAgent:
         # Each run = 9 API calls (3 models × 3 stages) = 27 max simultaneous requests.
         # Adjust down to 2 if hitting OpenRouter rate limits in production.
         semaphore = asyncio.Semaphore(3)
+        total = len(companies)
+        completed = 0
 
         async def analyze_with_sem(company):
+            nonlocal completed
             async with semaphore:
                 result = await self.analyze(company)
+                completed += 1
                 if progress_callback:
+                    fraction = completed / total if total else 1.0
+                    msg = f"Council reviewed {completed}/{total} companies"
                     if asyncio.iscoroutinefunction(progress_callback):
-                        await progress_callback(f"Council reviewed: {company.get('name')}", 0)
+                        await progress_callback(msg, fraction)
                     else:
-                        progress_callback(f"Council reviewed: {company.get('name')}", 0)
+                        progress_callback(msg, fraction)
                 return (company.get("id", ""), result)
 
         return await asyncio.gather(*[analyze_with_sem(c) for c in companies])

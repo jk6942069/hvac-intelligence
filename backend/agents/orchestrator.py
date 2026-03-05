@@ -297,7 +297,7 @@ class PipelineOrchestrator:
                     council_agent = CouncilAgent(api_key=settings.openrouter_api_key)
                     council_results = await council_agent.analyze_batch(
                         qualified,
-                        progress_callback=lambda m, p: asyncio.ensure_future(
+                        progress_callback=lambda m, p: asyncio.create_task(
                             self._broadcast("council", m, 0.77 + p * 0.15)
                         ),
                     )
