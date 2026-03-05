@@ -10,9 +10,26 @@ from models import Company, Dossier, Memo
 router = APIRouter(prefix="/dealdesk", tags=["dealdesk"])
 
 WORKFLOW_STATUSES = [
-    "not_contacted", "contacted", "responded", "interested",
-    "not_interested", "follow_up", "closed_lost", "closed_won",
+    "not_contacted",
+    "contacted",
+    "conversation_started",
+    "meeting_scheduled",
+    "under_review",
+    "loi_considered",
+    "passed",
 ]
+
+# Maps old states to new for DB migration
+WORKFLOW_MIGRATION_MAP = {
+    "not_contacted":  "not_contacted",
+    "contacted":      "contacted",
+    "responded":      "contacted",
+    "interested":     "conversation_started",
+    "follow_up":      "conversation_started",
+    "closed_won":     "loi_considered",
+    "closed_lost":    "passed",
+    "not_interested": "passed",
+}
 
 
 def company_to_deal(c: Company, has_dossier: bool = False, has_memo: bool = False) -> dict:

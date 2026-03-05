@@ -33,12 +33,21 @@ export interface ScoreExplanation {
 export type WorkflowStatus =
   | 'not_contacted'
   | 'contacted'
-  | 'responded'
-  | 'interested'
-  | 'not_interested'
-  | 'follow_up'
-  | 'closed_lost'
-  | 'closed_won'
+  | 'conversation_started'
+  | 'meeting_scheduled'
+  | 'under_review'
+  | 'loi_considered'
+  | 'passed'
+
+export const WORKFLOW_LABELS: Record<WorkflowStatus, string> = {
+  not_contacted:        'Not Contacted',
+  contacted:            'Contacted',
+  conversation_started: 'Conversation Started',
+  meeting_scheduled:    'Meeting Scheduled',
+  under_review:         'Under Review',
+  loi_considered:       'LOI Considered',
+  passed:               'Passed',
+}
 
 export interface WorkflowEvent {
   id: string
@@ -111,6 +120,8 @@ export interface Company {
   rank: number | null
   hasDossier: boolean
   hasMemo: boolean
+  dossier?: DossierDetail | null
+  feedback?: Feedback | null
   createdAt: string | null
   updatedAt: string | null
 }
@@ -119,6 +130,25 @@ export interface Deal extends Company {}
 
 export interface DossierDetail {
   id: string
+  content: string
+  generatedAt: string | null
+  modelUsed: string
+}
+
+export interface Feedback {
+  outcome: string
+  notes: string | null
+  date: string | null
+}
+
+export interface DossierItem {
+  id: string
+  companyId: string
+  companyName: string
+  companyCity: string
+  companyState: string
+  companyScore: number
+  companyRank: number | null
   content: string
   generatedAt: string | null
   modelUsed: string

@@ -10,12 +10,21 @@ import clsx from 'clsx'
 import { fetchCompany, submitFeedback, generateDossier } from '../api/client'
 import ScoreBar from '../components/ScoreBar'
 import SignalBadge from '../components/SignalBadge'
+import MemoExport from '../components/MemoExport'
 
 const FEEDBACK_OPTIONS = [
   { value: 'responded', label: 'Owner Responded', cls: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' },
   { value: 'uninterested', label: 'Not Interested', cls: 'border-slate-600 text-slate-400' },
   { value: 'already_selling', label: 'Already Selling', cls: 'border-amber-500/40 text-amber-400 bg-amber-500/10' },
 ]
+
+const DETAIL_TABS = [
+  { id: 'dossier', label: 'Dossier' },
+  { id: 'signals', label: 'Signals' },
+  { id: 'valuation', label: 'Valuation' },
+] as const
+
+type DetailTab = typeof DETAIL_TABS[number]['id']
 
 function ScoreBreakdownBar({ label, value, max }: { label: string; value: number; max: number }) {
   return (
@@ -40,6 +49,7 @@ export default function CompanyDetail() {
   const qc = useQueryClient()
   const [feedbackNote, setFeedbackNote] = useState('')
   const [selectedOutcome, setSelectedOutcome] = useState('')
+  const [activeTab, setActiveTab] = useState<DetailTab>('dossier')
 
   const { data: company, isLoading } = useQuery({
     queryKey: ['company', id],
@@ -275,19 +285,31 @@ export default function CompanyDetail() {
           </div>
         </div>
 
-        {/* Dossier */}
+        {/* Right column: tabbed panel */}
         <div className="col-span-2">
           <div className="card p-5 h-full">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-slate-300 text-sm font-medium flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Acquisition Dossier
-              </h2>
-              {!hasDossier && (
+            {/* Tab bar */}
+            <div className="flex items-center gap-1 mb-5 border-b border-surface-700 pb-3">
+              {DETAIL_TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={clsx(
+                    'px-3 py-1.5 text-xs font-medium rounded-md transition-colors',
+                    activeTab === tab.id
+                      ? 'bg-accent/20 text-accent'
+                      : 'text-slate-500 hover:text-slate-300'
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+              {/* Generate dossier button in header when on dossier tab */}
+              {activeTab === 'dossier' && !hasDossier && (
                 <button
                   onClick={() => dossierMut.mutate()}
                   disabled={dossierMut.isPending}
-                  className="btn-primary flex items-center gap-2 text-xs"
+                  className="btn-primary flex items-center gap-2 text-xs ml-auto"
                 >
                   {dossierMut.isPending
                     ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
@@ -297,27 +319,195 @@ export default function CompanyDetail() {
               )}
             </div>
 
-            {hasDossier ? (
-              <div className="dossier-content prose prose-invert max-w-none">
-                <ReactMarkdown>{company.dossier!.content}</ReactMarkdown>
-                <div className="mt-6 pt-4 border-t border-surface-700 flex items-center gap-2 text-slate-600 text-xs">
-                  <Clock className="w-3.5 h-3.5" />
-                  Generated {company.dossier!.generatedAt
-                    ? new Date(company.dossier!.generatedAt).toLocaleString() : '—'}
-                  · {company.dossier!.modelUsed}
+            {/* Dossier tab */}
+            {activeTab === 'dossier' && (
+              <>
+                {hasDossier ? (
+                  <div className="dossier-content prose prose-invert max-w-none">
+                    {company.dossier?.content && (
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="terminal-label text-[10px]">INVESTMENT MEMO</div>
+                        <MemoExport
+                          memoContent={company.dossier.content}
+                          companyName={company?.name || 'company'}
+                          memoId={company.dossier?.id}
+                        />
+                      </div>
+                    )}
+                    <ReactMarkdown>{company.dossier!.content}</ReactMarkdown>
+                    <div className="mt-6 pt-4 border-t border-surface-700 flex items-center gap-2 text-slate-600 text-xs">
+                      <Clock className="w-3.5 h-3.5" />
+                      Generated {company.dossier!.generatedAt
+                        ? new Date(company.dossier!.generatedAt).toLocaleString() : '—'}
+                      · {company.dossier!.modelUsed}
+                    </div>
+                  </div>
+                ) : dossierMut.isPending ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-center">
+                    <Loader2 className="w-8 h-8 text-accent animate-spin mb-3" />
+                    <p className="text-slate-400 text-sm">Generating investor dossier…</p>
+                    <p className="text-slate-600 text-xs mt-1">Using AI to analyze signals and write report</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 text-center">
+                    <FileText className="w-10 h-10 text-slate-700 mb-3" />
+                    <p className="text-slate-400 text-sm">No dossier generated yet</p>
+                    <p className="text-slate-600 text-xs mt-1">Click "Generate Dossier" to create an investor-ready report</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Signals tab */}
+            {activeTab === 'signals' && (
+              <div className="space-y-6">
+                {/* Score formula bar */}
+                <div className="glass-card p-4">
+                  <div className="terminal-label text-[10px] mb-3">CONVICTION FORMULA</div>
+                  <div className="text-xs text-slate-400 font-mono mb-2">
+                    Score = Operating Age + Digital Health + Review Signals + Lifecycle Signals
+                  </div>
+                  <div className="flex h-2 rounded overflow-hidden gap-0.5">
+                    {[
+                      { key: 'operating_age', color: 'bg-blue-500', max: 25 },
+                      { key: 'digital_health', color: 'bg-emerald-500', max: 30 },
+                      { key: 'review_signals', color: 'bg-purple-500', max: 25 },
+                      { key: 'lifecycle_signals', color: 'bg-amber-500', max: 20 },
+                    ].map(({ key, color, max }) => {
+                      const val = (company?.scoreBreakdown as Record<string, number> | undefined)?.[key] ?? 0
+                      return (
+                        <div
+                          key={key}
+                          className={`${color} opacity-80`}
+                          style={{ width: `${(val / max) * 100}%` }}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Positive signals */}
+                <div>
+                  <div className="terminal-label text-[10px] text-emerald-400 mb-3">
+                    POSITIVE SIGNALS
+                  </div>
+                  <div className="space-y-2">
+                    {(company?.signals || [])
+                      .filter(s => (s.points ?? 0) > 0)
+                      .map((signal, i) => (
+                        <div key={i} className="glass-card p-3 border-emerald-500/20">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="text-xs font-mono text-emerald-400">{signal.label}</div>
+                              <div className="text-xs text-slate-400 mt-0.5">{signal.description}</div>
+                              <div className="text-[10px] text-slate-500 mt-1 font-mono capitalize">
+                                {signal.type || 'Score Factor'}
+                              </div>
+                            </div>
+                            <div className="text-xs font-mono text-emerald-400 whitespace-nowrap ml-4">
+                              +{signal.points ?? 0} pts
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    {(company?.signals || []).filter(s => (s.points ?? 0) > 0).length === 0 && (
+                      <p className="text-xs text-slate-500 font-mono">No positive signals detected yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Risk signals */}
+                <div>
+                  <div className="terminal-label text-[10px] text-rose-400 mb-3">
+                    RISK SIGNALS
+                  </div>
+                  <div className="space-y-2">
+                    {(company?.keyRisks || []).map((risk, i) => (
+                      <div key={i} className="glass-card p-3 border-rose-500/20">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="text-xs font-mono text-rose-400">{risk}</div>
+                            <div className="text-[10px] text-slate-500 mt-1 font-mono">Risk Adjustment</div>
+                          </div>
+                          <div className="text-xs font-mono text-rose-400 whitespace-nowrap ml-4">
+                            risk
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {!(company?.keyRisks?.length) && (
+                      <p className="text-xs text-slate-500 font-mono">No risk signals detected.</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            ) : dossierMut.isPending ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <Loader2 className="w-8 h-8 text-accent animate-spin mb-3" />
-                <p className="text-slate-400 text-sm">Generating investor dossier…</p>
-                <p className="text-slate-600 text-xs mt-1">Using AI to analyze signals and write report</p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <FileText className="w-10 h-10 text-slate-700 mb-3" />
-                <p className="text-slate-400 text-sm">No dossier generated yet</p>
-                <p className="text-slate-600 text-xs mt-1">Click "Generate Dossier" to create an investor-ready report</p>
+            )}
+
+            {/* Valuation tab */}
+            {activeTab === 'valuation' && (
+              <div className="space-y-4">
+                {/* Revenue estimate */}
+                <div className="glass-card p-4">
+                  <div className="terminal-label text-[10px] mb-3">REVENUE ESTIMATE</div>
+                  <div className="space-y-2 font-mono text-xs">
+                    {([
+                      ['Review count', `${company?.googleReviewCount ?? 0} reviews`],
+                      ['Jobs per review (industry avg)', '8×'],
+                      ['Estimated annual jobs', `${(company?.googleReviewCount ?? 0) * 8}`],
+                      ['Avg HVAC ticket size', '$385'],
+                    ] as [string, string][]).map(([label, value]) => (
+                      <div key={label} className="flex justify-between text-slate-400">
+                        <span>{label}</span>
+                        <span className="text-slate-300">{value}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between border-t border-slate-700 pt-2 mt-2">
+                      <span className="text-slate-300 font-semibold">Estimated Revenue</span>
+                      <span className="text-accent font-semibold">
+                        ~${((company?.googleReviewCount ?? 0) * 8 * 385).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* EBITDA estimate */}
+                <div className="glass-card p-4">
+                  <div className="terminal-label text-[10px] mb-3">EBITDA ESTIMATE</div>
+                  <div className="space-y-2 font-mono text-xs">
+                    {([
+                      ['EBITDA margin', '20% (HVAC avg: 15–25%)'],
+                      ['Estimated EBITDA', `~$${((company?.googleReviewCount ?? 0) * 8 * 385 * 0.20).toLocaleString()}`],
+                    ] as [string, string][]).map(([label, value]) => (
+                      <div key={label} className="flex justify-between text-slate-400">
+                        <span>{label}</span>
+                        <span className="text-slate-300">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Valuation range */}
+                <div className="glass-card p-4">
+                  <div className="terminal-label text-[10px] mb-3">VALUATION RANGE</div>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    {[
+                      { label: 'Conservative', key: 'low' as const, multiple: '3.5×' },
+                      { label: 'Base Case', key: 'mid' as const, multiple: '4.5×' },
+                      { label: 'Optimistic', key: 'high' as const, multiple: '5.5×' },
+                    ].map(({ label, key, multiple }) => (
+                      <div key={key} className="text-center">
+                        <div className="text-[10px] text-slate-500 font-mono mb-1">{label}</div>
+                        <div className="text-sm font-mono text-accent">
+                          ${(company?.valuationBand?.[key] ?? 0).toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono">{multiple} EBITDA</div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    Proxy estimate only. Verify with seller financials in diligence.
+                  </p>
+                </div>
               </div>
             )}
           </div>

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from database import get_db
 from models import Company, Dossier
+from config import settings
 
 router = APIRouter(prefix="/companies", tags=["companies"])
 
@@ -161,6 +162,18 @@ async def export_json(db: AsyncSession = Depends(get_db)):
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=hvac_acquisition_targets.json"},
     )
+
+
+@router.get("/valuation-config")
+async def get_valuation_config():
+    """Return valuation assumption defaults for the frontend valuation tab."""
+    return {
+        "ticketSize": settings.valuation_ticket_size,
+        "jobsPerReview": settings.valuation_jobs_per_review,
+        "ebitdaMargin": settings.valuation_ebitda_margin,
+        "multipleLow": settings.valuation_multiple_low,
+        "multipleHigh": settings.valuation_multiple_high,
+    }
 
 
 @router.get("/{company_id}")
