@@ -1,6 +1,9 @@
 # Worktrees
 .worktrees/
 
+# Embedded repos (tracked separately)
+llm-council/
+
 # Python
 __pycache__/
 *.py[cod]
