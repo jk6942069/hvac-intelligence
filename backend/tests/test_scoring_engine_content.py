@@ -42,7 +42,7 @@ def test_long_tenure_claimed_raises_transition_score():
     engine = ScoringEngine()
     without = engine.score(make_company(years_in_business_claimed=None))
     with_tenure = engine.score(make_company(years_in_business_claimed=28))
-    assert with_tenure[2] >= without[2]
+    assert with_tenure[2] > without[2]
 
 
 def test_commercial_service_raises_platform_score():

@@ -20,7 +20,12 @@ CONTENT_SIGNAL_KEYS = [
 
 
 def count_populated_signals(company: dict) -> int:
-    """Count content signal fields that are not None (False counts as populated)."""
+    """Count content signal fields that are not None (False and 0 count as populated).
+
+    Semantic distinction:
+    - None: field was never enriched (we don't know the answer)
+    - False/0: enrichment ran and found the answer is "no" or "zero" (valid information)
+    """
     return sum(
         1 for key in CONTENT_SIGNAL_KEYS
         if company.get(key) is not None

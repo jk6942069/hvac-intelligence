@@ -87,7 +87,7 @@ def _transition_pressure(company: dict) -> tuple:
         factors.append("Family-owned -- succession planning is a common exit trigger")
 
     # Claimed tenure supplements domain age signal
-    if years_claimed and years_claimed > 20:
+    if years_claimed and years_claimed >= 20:
         bonus = 5 if years_claimed >= 30 else 3
         score = min(40, score + bonus)
         factors.append(
@@ -110,6 +110,9 @@ def _business_quality(company: dict) -> tuple:
 
     # Rating quality -- proxy for service excellence and customer retention
     if rating >= 4.5 and review_count >= 100:
+        # +27 (not +30) intentionally — the 3-point gap allows offers_24_7 and
+        # service_count bonuses to register for top-tier companies rather than
+        # being silently absorbed by the cap.
         score += 27
         factors.append(f"{rating}★ rating with {review_count}+ reviews -- exceptional service track record")
     elif rating >= 4.5 and review_count >= 50:

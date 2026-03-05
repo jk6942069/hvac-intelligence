@@ -71,3 +71,21 @@ def test_custom_threshold_override():
     low_scorer = make_company(conviction_score=45)
     assert qualifies_for_council(low_scorer, min_conviction=40) is True
     assert qualifies_for_council(low_scorer, min_conviction=60) is False
+
+
+def test_custom_min_signals_override():
+    # A thin company (only 1 non-null signal) normally fails
+    thin = make_company(
+        is_family_owned_likely=None,
+        offers_24_7=None,
+        service_count_estimated=None,
+        years_in_business_claimed=None,
+        is_recruiting=True,   # Only this one
+        technician_count_estimated=None,
+        serves_commercial=None,
+    )
+    # With min_signals=1 it should pass (override allows thin company through)
+    assert qualifies_for_council(thin, min_signals=1) is True
+    # With min_signals=7 a company with only 5 signals fails
+    company_5_signals = make_company(is_recruiting=None, technician_count_estimated=None)
+    assert qualifies_for_council(company_5_signals, min_signals=7) is False
