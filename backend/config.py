@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
 
     # Council deliberation settings
-    council_models: list = ["anthropic/claude-sonnet-4-5", "openai/gpt-4o-mini", "google/gemini-flash-1.5"]
+    council_models: List[str] = ["anthropic/claude-sonnet-4-5", "openai/gpt-4o-mini", "google/gemini-flash-1.5"]
     council_chairman: str = "anthropic/claude-sonnet-4-5"
     council_min_conviction: int = 60      # Gate: skip council below this score
     council_min_signals: int = 4          # Gate: skip council if fewer non-null content signals
