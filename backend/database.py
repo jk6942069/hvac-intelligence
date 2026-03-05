@@ -51,6 +51,17 @@ async def migrate_db():
         "ALTER TABLE companies ADD COLUMN workflow_notes TEXT",
         "ALTER TABLE companies ADD COLUMN outreach_date VARCHAR",
         "ALTER TABLE companies ADD COLUMN last_contact_date VARCHAR",
+        # Content enrichment + council tracking columns (v3)
+        "ALTER TABLE companies ADD COLUMN is_family_owned_likely BOOLEAN",
+        "ALTER TABLE companies ADD COLUMN offers_24_7 BOOLEAN",
+        "ALTER TABLE companies ADD COLUMN service_count_estimated INTEGER",
+        "ALTER TABLE companies ADD COLUMN years_in_business_claimed INTEGER",
+        "ALTER TABLE companies ADD COLUMN is_recruiting BOOLEAN",
+        "ALTER TABLE companies ADD COLUMN technician_count_estimated INTEGER",
+        "ALTER TABLE companies ADD COLUMN serves_commercial BOOLEAN",
+        "ALTER TABLE companies ADD COLUMN discovery_source VARCHAR",
+        "ALTER TABLE companies ADD COLUMN content_enriched BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE companies ADD COLUMN council_analyzed BOOLEAN DEFAULT FALSE",
     ]
 
     async with engine.connect() as conn:
@@ -58,6 +69,6 @@ async def migrate_db():
             try:
                 await conn.execute(text(sql))
                 await conn.commit()
-            except Exception:
-                # Column already exists — safe to ignore
-                pass
+            except Exception as e:
+                if "duplicate column name" not in str(e).lower():
+                    raise

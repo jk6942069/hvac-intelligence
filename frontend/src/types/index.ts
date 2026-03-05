@@ -72,6 +72,17 @@ export interface Company {
   hasFacebook: boolean | null
   hasInstagram: boolean | null
   websiteOutdated?: boolean | null
+  // Content enrichment signals
+  isFamilyOwnedLikely?: boolean | null
+  offers247?: boolean | null
+  serviceCountEstimated?: number | null
+  yearsInBusinessClaimed?: number | null
+  isRecruiting?: boolean | null
+  technicianCountEstimated?: number | null
+  servesCommercial?: boolean | null
+  discoverySource?: string | null
+  contentEnriched?: boolean
+  councilAnalyzed?: boolean
   signals: Signal[]
   // Old score fields (backward compat)
   score: number
