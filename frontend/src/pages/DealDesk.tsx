@@ -10,9 +10,11 @@ import {
   fetchDealFeed, fetchTop5, fetchTearsheet, updateWorkflow, generateMemo, fetchComps
 } from '../api/client'
 import type { Deal, WorkflowStatus, MemoItem, Company } from '../types'
-import { WORKFLOW_LABELS as WORKFLOW_LABELS_FROM_TYPES } from '../types'
+import { WORKFLOW_LABELS as WORKFLOW_LABELS_TYPED } from '../types'
+const WORKFLOW_LABELS: Record<string, string> = WORKFLOW_LABELS_TYPED
 import ReactMarkdown from 'react-markdown'
 import MemoExport from '../components/MemoExport'
+import { US_STATES } from '../constants/us-states'
 
 const fmtDollar = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` :
@@ -25,8 +27,6 @@ const scoreBg = (s: number) =>
   s >= 60 ? 'bg-terminal-green/10 border-terminal-green/20' :
   s >= 40 ? 'bg-terminal-amber/10 border-terminal-amber/20' :
   'bg-terminal-red/10 border-terminal-red/20'
-
-const WORKFLOW_LABELS: Record<string, string> = WORKFLOW_LABELS_FROM_TYPES
 
 const WORKFLOW_STATUSES = Object.keys(WORKFLOW_LABELS) as WorkflowStatus[]
 
@@ -59,12 +59,6 @@ ${(deal.keyRisks as any)?.map((r: string) => `- ${r}`).join('\n') ?? '- Standard
 `
 }
 
-const US_STATES = [
-  'AL','AZ','AR','CA','CO','CT','DE','FL','GA','ID','IL','IN','IA','KS',
-  'KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT',
-  'VT','VA','WA','WV','WI','WY',
-]
 function ConvictionScoreBadge({ score }: { score: number }) {
   return (
     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border font-mono font-semibold text-base ${scoreBg(score)} ${scoreColor(score)}`}>

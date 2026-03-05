@@ -7,14 +7,7 @@ import {
 import { fetchCompanies } from '../api/client'
 import { WORKFLOW_LABELS } from '../types'
 import type { WorkflowStatus } from '../types'
-
-const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
-  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
-  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
-  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
-]
+import { US_STATES } from '../constants/us-states'
 
 const scoreColor = (s: number) =>
   s >= 60 ? 'text-terminal-green' : s >= 40 ? 'text-terminal-amber' : 'text-terminal-red'
