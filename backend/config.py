@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import Optional, List
 
@@ -25,7 +26,19 @@ class Settings(BaseSettings):
     council_min_signals: int = 4          # Gate: skip council if fewer non-null content signals
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./hvac_intel.db"
+    database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./hvac_intel.db")
+
+    # Supabase Auth
+    supabase_jwt_secret: str = ""
+
+    # Stripe
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_starter_price_id: str = ""
+    stripe_pro_price_id: str = ""
+
+    # CORS — include Vercel production domain when set
+    cors_origin_prod: str = ""   # e.g. "https://hvac-intel.vercel.app"
 
     # App
     app_secret_key: str = "hvac-intel-secret-change-in-prod"
