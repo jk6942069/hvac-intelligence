@@ -34,10 +34,16 @@ def normalize_company_key(name: str, phone: str, address: str) -> str:
     """
     Produce a normalized deduplication key.
     Strips punctuation, takes last 7 digits of phone, takes street number prefix.
+
+    Note: Only legal-entity suffixes (LLC, Inc, Corp, Co, Company) are stripped.
+    Industry words (heating, cooling, air, HVAC, services) are deliberately kept
+    to prevent false deduplication between distinct companies with similar geographic names.
+    Known limitation: abbreviations (AC vs. "Air Conditioning") may produce different
+    keys for the same company — this is acceptable for this use case.
     """
     # Normalize name: strip non-alpha, lowercase, remove legal entity suffixes only
     clean_name = re.sub(r"[^a-z0-9]", "", re.sub(
-        r"\b(llc|inc|corp|co|company|services?)\b", "",
+        r"\b(llc|inc|corp|co|company)\b", "",
         name.lower()
     ))
     # Normalize phone: digits only, last 7
@@ -226,5 +232,5 @@ class FirecrawlScout:
                 logger.info(f"Scout: {len(companies)} from {city}, {state}")
                 await asyncio.sleep(0.5)  # Polite delay between cities
             except Exception as e:
-                logger.warning(f"Scout failed for {city}, {state}: {e}")
+                logger.exception(f"Scout failed for {city}, {state}: {e}")
         return all_companies

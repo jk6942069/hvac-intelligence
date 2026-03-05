@@ -103,3 +103,64 @@ async def test_search_city_filters_national_chains():
     names = [c["name"] for c in companies]
     assert "One Hour Heating & Air Conditioning" not in names
     assert any("Local HVAC" in n or "HVAC Pro" in n for n in names)
+
+
+@pytest.mark.asyncio
+async def test_scrape_yellowpages_handles_object_response():
+    """_scrape_yellowpages handles ScrapeResponse object-style (result.extract)."""
+    mock_extract = {
+        "businesses": [
+            {
+                "name": "Valley HVAC Services",
+                "phone": "602-555-1111",
+                "address": "50 W Main St",
+                "rating": 4.6,
+                "review_count": 88,
+                "website": "https://valleyhvac.com",
+            }
+        ]
+    }
+    mock_result = MagicMock()
+    mock_result.extract = mock_extract
+
+    with patch("agents.firecrawl_scout.FirecrawlApp") as MockApp:
+        mock_instance = MagicMock()
+        mock_instance.scrape_url.return_value = mock_result
+        MockApp.return_value = mock_instance
+
+        scout = FirecrawlScout(api_key="fc-test")
+        companies = await scout._scrape_yellowpages("Phoenix", "AZ")
+
+    assert len(companies) == 1
+    assert companies[0]["name"] == "Valley HVAC Services"
+    assert companies[0]["discovery_source"] == "yellowpages"
+
+
+@pytest.mark.asyncio
+async def test_scrape_yellowpages_handles_dict_response():
+    """_scrape_yellowpages handles dict-style response (result['extract'])."""
+    mock_extract = {
+        "businesses": [
+            {
+                "name": "Sun State Cooling",
+                "phone": "480-555-2222",
+                "address": "100 E Oak Ave",
+                "rating": 4.4,
+                "review_count": 55,
+                "website": "https://sunstatecooling.com",
+            }
+        ]
+    }
+    mock_result = {"extract": mock_extract}
+
+    with patch("agents.firecrawl_scout.FirecrawlApp") as MockApp:
+        mock_instance = MagicMock()
+        mock_instance.scrape_url.return_value = mock_result
+        MockApp.return_value = mock_instance
+
+        scout = FirecrawlScout(api_key="fc-test")
+        companies = await scout._scrape_yellowpages("Phoenix", "AZ")
+
+    assert len(companies) == 1
+    assert companies[0]["name"] == "Sun State Cooling"
+    assert companies[0]["discovery_source"] == "yellowpages"
