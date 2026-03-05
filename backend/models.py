@@ -37,6 +37,18 @@ class Company(Base):
     has_instagram = Column(Boolean)
     website_outdated = Column(Boolean)
 
+    # Content enrichment signals (from website analysis)
+    is_family_owned_likely = Column(Boolean, nullable=True)
+    offers_24_7 = Column(Boolean, nullable=True)
+    service_count_estimated = Column(Integer, nullable=True)
+    years_in_business_claimed = Column(Integer, nullable=True)
+    is_recruiting = Column(Boolean, nullable=True)
+    technician_count_estimated = Column(Integer, nullable=True)
+    serves_commercial = Column(Boolean, nullable=True)
+    discovery_source = Column(String, nullable=True)   # "firecrawl_search" | "yellowpages" | "mock"
+    content_enriched = Column(Boolean, default=False)
+    council_analyzed = Column(Boolean, default=False)
+
     # Signals (JSON array of signal objects)
     signals = Column(JSON, default=list)
 
